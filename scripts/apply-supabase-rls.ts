@@ -10,11 +10,16 @@ async function main() {
   const sqlPath = path.join(__dirname, "../prisma/migrations/supabase_rls_security.sql");
   const sql = fs.readFileSync(sqlPath, "utf-8");
 
-  // Split by statements while handling comments
+  // Split on semicolons, keep multi-line statements intact
   const statements = sql
-    .split(/;\s*$/m)
+    .split(";")
     .map((s) => s.trim())
-    .filter((s) => s.length > 0 && !s.startsWith("--"));
+    .filter((s) => {
+      if (!s) return false;
+      // remove pure-comment chunks
+      const nonComment = s.replace(/--[^\n]*/g, "").trim();
+      return nonComment.length > 0;
+    });
 
   for (const statement of statements) {
     if (!statement || statement.startsWith("--")) continue;
