@@ -66,11 +66,15 @@ export async function POST(
         },
       });
 
-      // If official government deployment, mark challenge as SOLVED
+      // When solution is officially endorsed and deployed, challenge advances to DEPLOYED
+      // (Government endorsement != field resolution; remains DEPLOYED until field verification)
       if (newStatus === "DEPLOYED" || newStatus === "GOVT_VERIFIED") {
         await db.challenge.update({
           where: { id: solution.challengeId },
-          data: { status: "SOLVED" },
+          data: {
+            status: "DEPLOYED",
+            selectedSolutionId: solution.id,
+          },
         });
       }
 

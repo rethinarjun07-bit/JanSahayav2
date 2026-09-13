@@ -8,7 +8,9 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const radiusParam = searchParams.get("radiusKm");
-    const radiusKm = radiusParam ? parseFloat(radiusParam) : 2.5;
+    const rawRadius = radiusParam ? parseFloat(radiusParam) : 2.5;
+    // Enforce safe radius bounds between 0.5 km and 50.0 km to prevent DoS
+    const radiusKm = isNaN(rawRadius) ? 2.5 : Math.min(50.0, Math.max(0.5, rawRadius));
 
     const challenges = await db.challenge.findMany({
       where: { status: { not: "MERGED" } },
@@ -22,6 +24,8 @@ export async function GET(request: Request) {
         urgencyScore: true,
         status: true,
       },
+      take: 200,
+      orderBy: { urgencyScore: "desc" },
     });
 
     const clusters = detectCivicClusters(challenges, radiusKm);

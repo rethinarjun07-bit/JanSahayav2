@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import db from "@/lib/db";
-import { hashPassword } from "@/lib/auth";
+import { hashPassword, getUserFromRequest } from "@/lib/auth";
 import { SMSParseInputSchema } from "@/lib/validators";
 import { getClientIp, checkRateLimit, createRateLimitResponse, RATE_LIMIT_BUCKETS } from "@/lib/rate-limiter";
 import { safeLog } from "@/lib/safe-logger";
@@ -11,7 +11,35 @@ import crypto from "crypto";
 // Also understands Hindi: "बाढ़ रांची गंभीर"
 export async function POST(request: NextRequest) {
   try {
-    // ── 1. Rate Limiting ────────────────────────────────────────────────────
+    // ── 1. Webhook Authentication Gate ──────────────────────────────────────
+    const webhookSecret = process.env.SMS_WEBHOOK_SECRET || process.env.SMS_GATEWAY_KEY || "jansahaya-sih-sms-webhook-secure-key";
+    const providedSecret =
+      request.headers.get("x-sms-webhook-secret") ||
+      request.headers.get("x-webhook-token") ||
+      request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+
+    let isSecretValid = false;
+    if (providedSecret && webhookSecret && providedSecret.length === webhookSecret.length) {
+      isSecretValid = crypto.timingSafeEqual(
+        Buffer.from(providedSecret),
+        Buffer.from(webhookSecret)
+      );
+    }
+
+    const session = await getUserFromRequest(request);
+    const isAdmin = session?.role === "ADMIN";
+
+    if (!isSecretValid && !isAdmin) {
+      return NextResponse.json(
+        {
+          error: "Unauthorized: Valid SMS gateway webhook secret (x-sms-webhook-secret) or ADMIN authentication required.",
+          code: "WEBHOOK_UNAUTHORIZED",
+        },
+        { status: 401 }
+      );
+    }
+
+    // ── 2. Rate Limiting ────────────────────────────────────────────────────
     const clientIp = getClientIp(request);
     const rl = checkRateLimit(clientIp, RATE_LIMIT_BUCKETS.AI_ANON);
     if (!rl.success) {

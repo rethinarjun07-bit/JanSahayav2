@@ -18,25 +18,26 @@ export async function GET() {
     const totalCitizens = await db.user.count({ where: { role: "CITIZEN" } });
     const totalIndustry = await db.user.count({ where: { role: "INDUSTRY" } });
 
-    // Category Breakdown
-    const challenges = await db.challenge.findMany({
-      select: { category: true, severity: true, district: true, status: true },
-    });
+    // Database-level Aggregation via Prisma groupBy (O(1) memory footprint)
+    const [categoryGroups, severityGroups, districtGroups] = await Promise.all([
+      db.challenge.groupBy({
+        by: ["category"],
+        _count: { id: true },
+      }),
+      db.challenge.groupBy({
+        by: ["severity"],
+        _count: { id: true },
+      }),
+      db.challenge.groupBy({
+        by: ["district"],
+        _count: { id: true },
+      }),
+    ]);
 
-    const categoryCounts: Record<string, number> = {};
-    const severityCounts: Record<string, number> = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
-    const districtCounts: Record<string, number> = {};
-
-    for (const c of challenges) {
-      categoryCounts[c.category] = (categoryCounts[c.category] || 0) + 1;
-      severityCounts[c.severity] = (severityCounts[c.severity] || 0) + 1;
-      districtCounts[c.district] = (districtCounts[c.district] || 0) + 1;
-    }
-
-    const categoryData = Object.entries(categoryCounts).map(([name, value]) => ({ name, value }));
-    const severityData = Object.entries(severityCounts).map(([name, value]) => ({ name, value }));
-    const districtData = Object.entries(districtCounts)
-      .map(([name, count]) => ({ name, count }))
+    const categoryData = categoryGroups.map((g) => ({ name: g.category, value: g._count.id }));
+    const severityData = severityGroups.map((g) => ({ name: g.severity, value: g._count.id }));
+    const districtData = districtGroups
+      .map((g) => ({ name: g.district, count: g._count.id }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 10);
 
@@ -57,7 +58,7 @@ export async function GET() {
         totalSolvers,
         totalCitizens,
         totalIndustry,
-        districtsCovered: Object.keys(districtCounts).length,
+        districtsCovered: districtGroups.length,
         csrPledgedCrores: "₹4.85 Cr",
         duplicateMergesCount: mergedChallenges,
       },

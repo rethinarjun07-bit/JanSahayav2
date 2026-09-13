@@ -5,22 +5,31 @@ import { HomeClient } from "@/components/home-client";
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  // Fetch live stats and featured challenges from database
-  const totalChallenges = await db.challenge.count();
-  const totalSolutions = await db.solution.count();
-  const totalSolvers = await db.user.count({ where: { role: "SOLVER" } });
-  const criticalCount = await db.challenge.count({ where: { severity: "CRITICAL" } });
+  let totalChallenges = 0;
+  let totalSolutions = 0;
+  let totalSolvers = 0;
+  let criticalCount = 0;
+  let featuredChallenges: any[] = [];
 
-  const featuredChallenges = await db.challenge.findMany({
-    where: { status: { not: "MERGED" } },
-    orderBy: [{ urgencyScore: "desc" }, { createdAt: "desc" }],
-    take: 6,
-    include: {
-      _count: {
-        select: { solutions: true, upvotes: true },
+  try {
+    totalChallenges = await db.challenge.count();
+    totalSolutions = await db.solution.count();
+    totalSolvers = await db.user.count({ where: { role: "SOLVER" } });
+    criticalCount = await db.challenge.count({ where: { severity: "CRITICAL" } });
+
+    featuredChallenges = await db.challenge.findMany({
+      where: { status: { not: "MERGED" } },
+      orderBy: [{ urgencyScore: "desc" }, { createdAt: "desc" }],
+      take: 6,
+      include: {
+        _count: {
+          select: { solutions: true, upvotes: true },
+        },
       },
-    },
-  });
+    });
+  } catch {
+    // Database offline or unreachable; gracefully degrade with default initial values
+  }
 
   return (
     <HomeClient

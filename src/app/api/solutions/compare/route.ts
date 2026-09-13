@@ -1,34 +1,50 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
+import { getUserFromRequest } from "@/lib/auth";
 import { compareSolutions, SolutionProposalTarget } from "@/lib/nlp/matcher";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
+    const session = await getUserFromRequest(request);
+    if (!session) {
+      return NextResponse.json(
+        { error: "Unauthorized: Authentication required to access proposal evaluations.", code: "AUTH_REQUIRED" },
+        { status: 401 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const challengeId = searchParams.get("challengeId");
 
-    let challenge = challengeId
-      ? await db.challenge.findUnique({
-          where: { id: challengeId },
-        })
-      : await db.challenge.findFirst({
-          where: { solutions: { some: {} } },
-        });
+    if (!challengeId) {
+      return NextResponse.json(
+        { error: "Query parameter 'challengeId' is required.", code: "PARAM_REQUIRED" },
+        { status: 400 }
+      );
+    }
+
+    const challenge = await db.challenge.findUnique({
+      where: { id: challengeId },
+    });
 
     if (!challenge) {
-      return NextResponse.json({ error: "No challenge with proposals found" }, { status: 404 });
+      return NextResponse.json({ error: "Challenge not found" }, { status: 404 });
     }
 
     const targetChallengeId = challenge.id;
 
     const solutions = await db.solution.findMany({
-      where: { challengeId: targetChallengeId },
+      where: {
+        challengeId: targetChallengeId,
+        status: { not: "DRAFT" },
+      },
       include: {
         author: { select: { id: true, name: true, organization: true } },
         _count: { select: { reviews: true } },
       },
+      take: 20,
     });
 
     if (solutions.length === 0) {

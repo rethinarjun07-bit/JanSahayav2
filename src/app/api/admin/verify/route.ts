@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { getUserFromRequest } from "@/lib/auth";
 import { VerificationSchema } from "@/lib/validators";
+import { isValidChallengeTransition } from "@/lib/lifecycle";
 
 export async function POST(request: Request) {
   try {
@@ -31,6 +32,19 @@ export async function POST(request: Request) {
     const challenge = await db.challenge.findUnique({ where: { id: challengeId } });
     if (!challenge) {
       return NextResponse.json({ error: "Challenge not found" }, { status: 404 });
+    }
+
+    // Enforce valid lifecycle state transition
+    if (!isValidChallengeTransition(challenge.status, status)) {
+      return NextResponse.json(
+        {
+          error: `Invalid lifecycle transition: Cannot transition challenge from '${challenge.status}' to '${status}'.`,
+          code: "INVALID_LIFECYCLE_TRANSITION",
+          currentStatus: challenge.status,
+          attemptedStatus: status,
+        },
+        { status: 400 }
+      );
     }
 
     const updated = await db.challenge.update({

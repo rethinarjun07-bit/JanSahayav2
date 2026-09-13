@@ -130,6 +130,10 @@ export default function ChallengesCatalogPage() {
         setSimNotification(`🚨 Live Ingestion: "${data.challenge.title}" in ${data.challenge.district}`);
         await fetchChallenges();
         setTimeout(() => setSimNotification(null), 8000);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setSimNotification(`⚠️ ${data.error || "Simulation restricted: Government Authority (Admin) authentication required."}`);
+        setTimeout(() => setSimNotification(null), 6000);
       }
     } catch (err) {
       console.error("Simulation error:", err);

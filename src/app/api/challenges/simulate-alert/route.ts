@@ -1,5 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import db from "@/lib/db";
+import { getUserFromRequest } from "@/lib/auth";
+import { getClientIp, checkRateLimit, createRateLimitResponse, RATE_LIMIT_BUCKETS } from "@/lib/rate-limiter";
 import { classifyChallenge } from "@/lib/nlp/classifier";
 
 const SIMULATED_TEMPLATES = [
@@ -47,8 +49,25 @@ const SIMULATED_TEMPLATES = [
   },
 ];
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
+    const clientIp = getClientIp(request);
+    const rl = checkRateLimit(clientIp, RATE_LIMIT_BUCKETS.AI_ANON);
+    if (!rl.success) {
+      return createRateLimitResponse(rl.reset, "Rate limit exceeded for simulation actions.");
+    }
+
+    const session = await getUserFromRequest(request);
+    if (!session || session.role !== "ADMIN") {
+      return NextResponse.json(
+        {
+          error: "Forbidden: Only authorized Government Administrators can trigger simulated civic alerts.",
+          code: "ADMIN_REQUIRED",
+        },
+        { status: 403 }
+      );
+    }
+
     let citizenUser = await db.user.findFirst({
       where: { role: "CITIZEN" },
     });

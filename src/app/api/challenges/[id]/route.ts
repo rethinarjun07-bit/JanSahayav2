@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { getUserFromRequest } from "@/lib/auth";
+import { isValidChallengeTransition } from "@/lib/lifecycle";
 
 export async function GET(
   request: Request,
@@ -144,6 +145,20 @@ export async function PUT(
     }
 
     // Admin updates (Government Authority)
+    if (body.status && body.status !== existingChallenge.status) {
+      if (!isValidChallengeTransition(existingChallenge.status, body.status)) {
+        return NextResponse.json(
+          {
+            error: `Invalid lifecycle transition: Cannot transition challenge from '${existingChallenge.status}' to '${body.status}'.`,
+            code: "INVALID_LIFECYCLE_TRANSITION",
+            currentStatus: existingChallenge.status,
+            attemptedStatus: body.status,
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     const updated = await db.challenge.update({
       where: { id },
       data: {

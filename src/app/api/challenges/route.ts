@@ -50,18 +50,27 @@ export async function GET(request: Request) {
       where.status = status;
     }
 
-    const challenges = await db.challenge.findMany({
-      where,
-      orderBy: [{ urgencyScore: "desc" }, { createdAt: "desc" }],
-      include: {
-        createdBy: {
-          select: { id: true, name: true, role: true, organization: true },
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "50", 10) || 50));
+    const skip = (page - 1) * limit;
+
+    const [totalCount, challenges] = await Promise.all([
+      db.challenge.count({ where }),
+      db.challenge.findMany({
+        where,
+        orderBy: [{ urgencyScore: "desc" }, { createdAt: "desc" }],
+        skip,
+        take: limit,
+        include: {
+          createdBy: {
+            select: { id: true, name: true, role: true, organization: true },
+          },
+          _count: {
+            select: { solutions: true, upvotes: true, comments: true, duplicates: true },
+          },
         },
-        _count: {
-          select: { solutions: true, upvotes: true, comments: true, duplicates: true },
-        },
-      },
-    });
+      }),
+    ]);
 
     const now = new Date().getTime();
 
@@ -93,7 +102,13 @@ export async function GET(request: Request) {
           sdgGoals: c.sdgGoals ? JSON.parse(c.sdgGoals) : [],
         };
       }),
-      total: challenges.length,
+      pagination: {
+        page,
+        limit,
+        total: totalCount,
+        totalPages: Math.ceil(totalCount / limit),
+      },
+      total: totalCount,
     });
   } catch (error: unknown) {
     console.error("Fetch Challenges Error:", error);

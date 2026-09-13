@@ -219,14 +219,37 @@ export default function AIChatWidget() {
     setPreviousEntities(undefined);
   };
 
-  // Markdown-like text renderer
-  const renderText = (text: string) => {
-    return text
-      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-      .replace(/\*(.*?)\*/g, "<em>$1</em>")
-      .replace(/`(.*?)`/g, "<code class='bg-slate-100 px-1 py-0.5 rounded text-xs font-mono text-slate-800'>$1</code>")
-      .replace(/\n/g, "<br/>")
-      .replace(/•/g, "&#8226;");
+  // Safe React message renderer: avoids dangerouslySetInnerHTML entirely
+  // Parses markdown tokens (bold, italic, inline code, line breaks)
+  // while treating all text as safe React nodes to completely neutralize XSS.
+  const renderSafeContent = (content: string): React.ReactNode => {
+    const lines = content.split("\n");
+    return lines.map((line, lineIdx) => {
+      const parts = line.split(/(\*\*.*?\*\*|\*.*?\*|`.*?`)/g);
+      const renderedLine = parts.map((part, partIdx) => {
+        if (part.startsWith("**") && part.endsWith("**") && part.length >= 4) {
+          return <strong key={partIdx}>{part.slice(2, -2)}</strong>;
+        }
+        if (part.startsWith("*") && part.endsWith("*") && part.length >= 2) {
+          return <em key={partIdx}>{part.slice(1, -1)}</em>;
+        }
+        if (part.startsWith("`") && part.endsWith("`") && part.length >= 2) {
+          return (
+            <code key={partIdx} className="bg-slate-100 px-1 py-0.5 rounded text-xs font-mono text-slate-800">
+              {part.slice(1, -1)}
+            </code>
+          );
+        }
+        return part;
+      });
+
+      return (
+        <React.Fragment key={lineIdx}>
+          {renderedLine}
+          {lineIdx < lines.length - 1 && <br />}
+        </React.Fragment>
+      );
+    });
   };
 
   const formatTime = (date: Date) => {
@@ -355,7 +378,7 @@ export default function AIChatWidget() {
                             : "bg-white border border-slate-200/90 text-slate-800 rounded-tl-sm shadow-sm"
                         }`}
                       >
-                        <div dangerouslySetInnerHTML={{ __html: renderText(msg.text) }} />
+                        <div className="whitespace-pre-wrap">{renderSafeContent(msg.text)}</div>
 
                         {/* Optional Rich Card */}
                         {msg.card && (

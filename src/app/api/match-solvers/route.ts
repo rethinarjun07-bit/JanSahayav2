@@ -1,11 +1,20 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
+import { getUserFromRequest } from "@/lib/auth";
 import { computeSolverMatch, SolverProfile, ChallengeTarget } from "@/lib/nlp/matcher";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
+    const session = await getUserFromRequest(request);
+    if (!session) {
+      return NextResponse.json(
+        { error: "Unauthorized: Authentication required to access solver matching.", code: "AUTH_REQUIRED" },
+        { status: 401 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const challengeId = searchParams.get("challengeId");
     const solverId = searchParams.get("solverId");
@@ -22,11 +31,20 @@ export async function GET(request: Request) {
 
       const solvers = await db.user.findMany({
         where: { role: "SOLVER" },
-        include: {
+        select: {
+          id: true,
+          name: true,
+          organization: true,
+          designation: true,
+          district: true,
+          state: true,
+          skills: true,
+          karmaPoints: true,
           _count: {
             select: { solutions: true },
           },
         },
+        take: 50,
       });
 
       const challengeTarget: ChallengeTarget = {
@@ -95,6 +113,7 @@ export async function GET(request: Request) {
       const challenges = await db.challenge.findMany({
         where: { status: { not: "MERGED" } },
         orderBy: { urgencyScore: "desc" },
+        take: 50,
       });
 
       const matchedChallenges = challenges.map((c) => {

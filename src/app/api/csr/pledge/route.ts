@@ -57,6 +57,18 @@ export async function POST(request: Request) {
     let targetSolution = null;
     if (solutionId) {
       targetSolution = await db.solution.findUnique({ where: { id: solutionId } });
+      if (!targetSolution) {
+        return NextResponse.json({ error: "Specified solution not found" }, { status: 404 });
+      }
+      if (targetSolution.challengeId !== challengeId) {
+        return NextResponse.json(
+          {
+            error: "Integrity error: Solution does not belong to the specified challenge.",
+            code: "CHALLENGE_SOLUTION_MISMATCH",
+          },
+          { status: 400 }
+        );
+      }
     } else {
       // Find top solution for this challenge
       targetSolution = await db.solution.findFirst({ where: { challengeId } });
