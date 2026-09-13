@@ -120,7 +120,7 @@ def health_check():
         "status": "healthy",
         "service": "JanSahaya Python FastAPI Backend",
         "version": "1.0.0",
-        "database": "PostgreSQL / SQLite",
+        "database": "PostgreSQL (Single Source of Truth)",
         "aiServices": [
             "TF-IDF Duplicate Detection",
             "Disaster Urgency & Severity Scoring",

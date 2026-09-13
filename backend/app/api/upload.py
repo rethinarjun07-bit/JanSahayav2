@@ -18,6 +18,34 @@ ALLOWED_MIME_TYPES = {
     "audio/webm", "audio/wav", "audio/mpeg", "audio/mp3", "audio/ogg"
 }
 
+def validate_magic_bytes(content: bytes) -> bool:
+    if len(content) < 4:
+        return False
+    # JPEG: FF D8 FF
+    if content[:3] == b"\xff\xd8\xff":
+        return True
+    # PNG: 89 50 4E 47
+    if content[:4] == b"\x89PNG":
+        return True
+    # GIF: 47 49 46
+    if content[:3] == b"GIF":
+        return True
+    # RIFF (WEBP or WAV)
+    if content[:4] == b"RIFF":
+        if len(content) >= 12 and content[8:12] in (b"WEBP", b"WAVE"):
+            return True
+        return True
+    # OGG: 4F 67 67 53
+    if content[:4] == b"OggS":
+        return True
+    # MP3: ID3 header or MPEG sync
+    if content[:3] == b"ID3" or (content[0] == 0xff and (content[1] & 0xe0) == 0xe0):
+        return True
+    # WebM / Matroska: 1A 45 DF A3
+    if content[:4] == b"\x1a\x45\xdf\xa3":
+        return True
+    return False
+
 @router.post("")
 async def upload_file(
     file: UploadFile = File(...),
@@ -62,6 +90,13 @@ async def upload_file(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"File size exceeds 10MB limit (size: {len(content) / (1024 * 1024):.1f}MB)"
+        )
+
+    # Validate Magic Bytes / File Signature
+    if not validate_magic_bytes(content):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File content signature does not match valid image or audio format (magic byte check failed)."
         )
 
     with open(dest_path, "wb") as buffer:

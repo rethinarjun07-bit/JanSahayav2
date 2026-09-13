@@ -36,7 +36,7 @@ elif db_url.startswith("file:"):
         db_url = f"sqlite:///{clean_path}"
 
 try:
-    # Attempt to connect using configured URL
+    # Attempt to connect using configured URL (PostgreSQL single source of truth)
     connect_args = {}
     if db_url.startswith("sqlite"):
         connect_args = {"check_same_thread": False}
@@ -47,9 +47,14 @@ try:
         pass
     logger.info(f"Connected to database: {db_url.split('@')[-1] if '@' in db_url else db_url}")
 except Exception as e:
-    logger.warning(f"Could not connect to {db_url} ({e}). Falling back to local SQLite 'sqlite:///./jansahaya.db' for seamless development.")
-    fallback_url = "sqlite:///./jansahaya.db"
-    engine = create_engine(fallback_url, connect_args={"check_same_thread": False})
+    logger.critical(
+        f"FATAL: Database connection failed for {db_url.split('@')[-1] if '@' in db_url else db_url}: {e}. "
+        "Silent SQLite fallback is disabled to enforce PostgreSQL as the single source of truth. "
+        "Ensure PostgreSQL is running and accessible via DATABASE_URL."
+    )
+    raise RuntimeError(
+        f"Database connection failed: {e}. PostgreSQL single source of truth must be reachable."
+    ) from e
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()

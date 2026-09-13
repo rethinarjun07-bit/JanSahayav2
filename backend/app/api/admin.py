@@ -63,6 +63,12 @@ def assign_university(
     if not challenge:
         raise HTTPException(status_code=404, detail="Challenge not found")
 
+    if challenge.status not in ["VERIFIED", "ASSIGNED", "IN_PROGRESS"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot assign research lab to an unverified challenge. Challenge must be officially verified by Government first."
+        )
+
     university = db.query(University).filter(University.id == req.universityId).first()
     if not university:
         raise HTTPException(status_code=404, detail="University not found")

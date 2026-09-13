@@ -289,19 +289,42 @@ def endorse_solution(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    if current_user.role not in ["ADMIN", "INDUSTRY"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Only Government Authorities (ADMIN) or Industry CSR Partners (INDUSTRY) can endorse solutions."
+        )
+
     solution = db.query(Solution).filter(Solution.id == id).first()
     if not solution:
         raise HTTPException(status_code=404, detail="Solution not found")
 
-    solution.govt_endorsed = True
-    solution.endorsed_by = req.endorsedBy or current_user.name
-    solution.endorsed_at = datetime.utcnow()
-    solution.status = "GOVT_VERIFIED"
+    if current_user.role == "ADMIN":
+        solution.govt_endorsed = True
+        solution.endorsed_by = req.endorsedBy or current_user.name
+        solution.endorsed_at = datetime.utcnow()
+        solution.status = "GOVT_VERIFIED"
+        db.commit()
 
-    db.commit()
+        return {
+            "success": True,
+            "message": "Solution officially endorsed by Government Authority",
+            "govtEndorsed": True,
+            "endorsedBy": solution.endorsed_by,
+            "endorsedAt": solution.endorsed_at.isoformat(),
+            "status": solution.status,
+        }
+    else:
+        # Industry CSR Partner: Support & funding endorsement only
+        solution.csr_funding_status = "PLEDGED"
+        solution.csr_funder_name = req.endorsedBy or current_user.name
+        db.commit()
 
-    return {
-        "message": "Solution endorsed successfully by official nodal authorities",
-        "endorsedBy": solution.endorsed_by,
-        "endorsedAt": solution.endorsed_at.isoformat(),
-    }
+        return {
+            "success": True,
+            "message": "Industry CSR endorsement and pledge recorded. Note: Official government verification and deployment remain under Government Authority.",
+            "govtEndorsed": False,
+            "csrFundingStatus": solution.csr_funding_status,
+            "csrFunderName": solution.csr_funder_name,
+            "status": solution.status,
+        }

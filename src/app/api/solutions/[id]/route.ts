@@ -113,10 +113,25 @@ export async function PUT(
     const govtEndorsed = isAdmin && typeof body.govtEndorsed === "boolean" ? body.govtEndorsed : existingSolution.govtEndorsed;
     const endorsedBy = isAdmin && body.endorsedBy ? body.endorsedBy : existingSolution.endorsedBy;
 
+    // Authors cannot elevate their solution to GOVT_VERIFIED or DEPLOYED
+    let newStatus = existingSolution.status;
+    if (body.status) {
+      if (!isAdmin && ["GOVT_VERIFIED", "DEPLOYED"].includes(body.status)) {
+        return NextResponse.json(
+          {
+            error: "Forbidden: Only Authorized Government Authorities can mark a solution as GOVT_VERIFIED or DEPLOYED.",
+            code: "INSUFFICIENT_PRIVILEGES",
+          },
+          { status: 403 }
+        );
+      }
+      newStatus = body.status;
+    }
+
     const updated = await db.solution.update({
       where: { id },
       data: {
-        status: body.status || existingSolution.status,
+        status: newStatus,
         milestoneStage: body.milestoneStage || existingSolution.milestoneStage,
         govtEndorsed,
         endorsedBy,

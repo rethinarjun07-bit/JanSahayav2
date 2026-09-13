@@ -22,6 +22,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Challenge and University IDs are required" }, { status: 400 });
     }
 
+    const challenge = await db.challenge.findUnique({ where: { id: challengeId } });
+    if (!challenge) {
+      return NextResponse.json({ error: "Challenge not found" }, { status: 404 });
+    }
+
+    // Official Government gate: Only verified challenges can be assigned to research universities
+    if (!["VERIFIED", "ASSIGNED", "IN_PROGRESS"].includes(challenge.status)) {
+      return NextResponse.json(
+        {
+          error: "Cannot assign research lab to an unverified challenge. Official Government statutory verification is required prior to institutional assignment.",
+          code: "CHALLENGE_NOT_VERIFIED",
+          currentStatus: challenge.status,
+        },
+        { status: 400 }
+      );
+    }
+
     const university = await db.university.findUnique({ where: { id: universityId } });
     if (!university) {
       return NextResponse.json({ error: "University not found" }, { status: 404 });

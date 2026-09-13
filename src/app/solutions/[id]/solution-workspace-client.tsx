@@ -79,9 +79,14 @@ export function SolutionWorkspaceClient({ solution }: Props) {
       });
 
       if (res.ok) {
+        const data = await res.json();
         triggerConfetti();
-        setGovtEndorsed(true);
-        setStatus("GOVT_VERIFIED");
+        if (data.solution?.govtEndorsed) {
+          setGovtEndorsed(true);
+        }
+        if (data.solution?.status) {
+          setStatus(data.solution.status);
+        }
       }
     } catch (err) {
       console.error(err);
