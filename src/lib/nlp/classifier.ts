@@ -88,7 +88,7 @@ export function computeEvidenceStrength(inputs: {
   if (hasCorroboration) score += 10;
 
   return {
-    score: Math.min(100, Math.max(20, score)),
+    score: Math.min(100, Math.max(0, score)),
     breakdown,
   };
 }
@@ -158,8 +158,12 @@ export function classifyChallenge(
   description: string,
   evidenceParams?: {
     hasGps?: boolean;
+    latitude?: number;
+    longitude?: number;
     mediaCount?: number;
     hasVoice?: boolean;
+    hasDetailedAddress?: boolean;
+    corroborationCount?: number;
   }
 ): ClassificationResult {
   const combined = `${title} ${description}`.toLowerCase();
@@ -259,14 +263,16 @@ export function classifyChallenge(
   const confidenceScore = Math.min(97, Math.max(35, confidence));
   const humanVerificationRecommended = confidenceScore < 60;
 
-  // 5. Compute Evidence Strength
+  // 5. Compute Evidence Strength based on real ground evidence
   const evidence = computeEvidenceStrength({
     hasGps: evidenceParams?.hasGps,
-    mediaUrlsCount: evidenceParams?.mediaCount || 1,
-    hasAudioOrVoice: evidenceParams?.hasVoice,
+    latitude: evidenceParams?.latitude,
+    longitude: evidenceParams?.longitude,
+    mediaUrlsCount: typeof evidenceParams?.mediaCount === "number" ? evidenceParams.mediaCount : 0,
+    hasAudioOrVoice: Boolean(evidenceParams?.hasVoice),
     descriptionLength: description.length,
-    hasDetailedAddress: true,
-    corroborationCount: 1,
+    hasDetailedAddress: Boolean(evidenceParams?.hasDetailedAddress),
+    corroborationCount: typeof evidenceParams?.corroborationCount === "number" ? evidenceParams.corroborationCount : 0,
   });
 
   // 6. Compute Priority Score

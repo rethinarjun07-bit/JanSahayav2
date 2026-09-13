@@ -151,11 +151,16 @@ export async function POST(request: Request) {
 
     const data = result.data;
 
-    // Run Hybrid NLP Classifier
+    // Run Hybrid NLP Classifier with real ground evidence parameters
+    const hasDetailedAddress = Boolean(data.address && data.address.trim().length >= 10);
     const classification = classifyChallenge(data.title, data.description, {
       hasGps: Boolean(data.latitude && data.longitude),
+      latitude: data.latitude,
+      longitude: data.longitude,
       mediaCount: data.mediaUrls?.length || 0,
       hasVoice: Boolean(data.audioUrl || data.voiceTranscript),
+      hasDetailedAddress,
+      corroborationCount: 0,
     });
 
     // Fetch existing challenges to run duplicate detection
@@ -231,6 +236,15 @@ export async function POST(request: Request) {
         autoAssignedUniversity: classification.recommendedUniversity.name,
         assignedUniversityId: matchedUni ? matchedUni.id : null,
         createdById: creatorId,
+
+        // Provenance Architecture (Citizen -> AI -> Official Government Determination)
+        citizenReportedCategory: data.category,
+        citizenReportedSeverity: data.severity,
+        aiPredictedCategory: classification.predictedCategory,
+        aiPredictedSeverity: classification.severity,
+        aiUrgencyScore: classification.urgencyScore,
+        officialGovernmentCategory: null,
+        officialGovernmentSeverity: null,
       },
     });
 

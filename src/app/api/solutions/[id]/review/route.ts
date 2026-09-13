@@ -32,6 +32,43 @@ export async function POST(
     const reviewerId = session.userId;
     const reviewerRole = session.role;
 
+    // ── 1. Fetch Solution & Enforce Anti-Self-Review ───────────────────────
+    const solution = await db.solution.findUnique({
+      where: { id: solutionId },
+    });
+    if (!solution) {
+      return NextResponse.json({ error: "Solution proposal not found" }, { status: 404 });
+    }
+
+    if (solution.authorId === reviewerId) {
+      return NextResponse.json(
+        {
+          error: "Forbidden: Solvers and proposal authors cannot review or evaluate their own proposals.",
+          code: "SELF_REVIEW_BLOCKED",
+        },
+        { status: 403 }
+      );
+    }
+
+    // ── 2. Check for Duplicate Review ──────────────────────────────────────
+    const existingReview = await db.review.findUnique({
+      where: {
+        reviewerId_solutionId: {
+          reviewerId,
+          solutionId,
+        },
+      },
+    });
+    if (existingReview) {
+      return NextResponse.json(
+        {
+          error: "Conflict: You have already submitted a formal technical review for this proposal. Duplicate reviews are not permitted.",
+          code: "DUPLICATE_REVIEW_BLOCKED",
+        },
+        { status: 409 }
+      );
+    }
+
     const body = await request.json();
     const result = ReviewSchema.safeParse({ ...body, solutionId });
     if (!result.success) {
@@ -60,11 +97,13 @@ export async function POST(
       },
     });
 
-    // Update solution status if mentor reviewed
-    await db.solution.update({
-      where: { id: solutionId },
-      data: { status: "MENTOR_REVIEW" },
-    });
+    // Update solution status to MENTOR_REVIEW if in PROPOSED stage
+    if (solution.status === "PROPOSED") {
+      await db.solution.update({
+        where: { id: solutionId },
+        data: { status: "MENTOR_REVIEW" },
+      });
+    }
 
     return NextResponse.json({ success: true, review });
   } catch (error: unknown) {

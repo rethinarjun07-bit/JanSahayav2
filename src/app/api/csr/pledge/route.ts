@@ -28,6 +28,7 @@ export async function POST(request: Request) {
         );
       }
       const defaultIndustry = await db.user.findFirst({ where: { role: "INDUSTRY" } });
+      userId = defaultIndustry?.id || "demo-industry-partner";
     } else if (session && session.role !== "INDUSTRY" && session.role !== "ADMIN") {
       return NextResponse.json(
         { error: "Forbidden: Only Industry CSR Partners or Government Authorities can submit grant pledges.", code: "INSUFFICIENT_PRIVILEGES" },

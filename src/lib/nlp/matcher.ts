@@ -29,9 +29,11 @@ export interface ExplainableMatch {
   solverId: string;
   solverName: string;
   organization: string;
+  recommendationType: "Explainable multi-factor solver recommendation";
   matchPercentage: number;
   fitVerdict: "PERFECT_MATCH" | "HIGH_ALIGNMENT" | "GOOD_FIT" | "PARTIAL_FIT";
   matchedSkills: string[];
+  disclaimer: string;
   breakdown: {
     skillRelevance: { score: number; max: 40; detail: string };
     districtProximity: { score: number; max: 25; detail: string };
@@ -128,9 +130,11 @@ export function computeSolverMatch(
     solverId: solver.id,
     solverName: solver.name,
     organization: solver.organization || "Independent Researcher",
+    recommendationType: "Explainable multi-factor solver recommendation",
     matchPercentage: totalScore,
     fitVerdict,
     matchedSkills,
+    disclaimer: "Advisory score for administrative decision support; statutory solver assignment authority rests with Government Nodal Officers.",
     breakdown: {
       skillRelevance: {
         score: skillPoints,

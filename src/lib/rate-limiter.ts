@@ -26,15 +26,25 @@ export interface RateLimitOptions {
   windowMs: number; // e.g. 60 * 1000 (1 minute)
 }
 
+const IPV4_REGEX = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
+const IPV6_REGEX = /^[0-9a-fA-F:]+$/;
+
 export function getClientIp(request: Request): string {
+  // Trust proxy order: Cloudflare -> True-Client-IP -> X-Real-IP -> X-Forwarded-For
+  const cfIp = request.headers.get("cf-connecting-ip")?.trim();
+  if (cfIp && (IPV4_REGEX.test(cfIp) || IPV6_REGEX.test(cfIp))) return cfIp;
+
+  const realIp = request.headers.get("x-real-ip")?.trim();
+  if (realIp && (IPV4_REGEX.test(realIp) || IPV6_REGEX.test(realIp))) return realIp;
+
   const forwarded = request.headers.get("x-forwarded-for");
   if (forwarded) {
-    return forwarded.split(",")[0].trim();
+    const candidate = forwarded.split(",")[0].trim();
+    if (IPV4_REGEX.test(candidate) || IPV6_REGEX.test(candidate)) {
+      return candidate;
+    }
   }
-  const realIp = request.headers.get("x-real-ip");
-  if (realIp) return realIp.trim();
-  const cfIp = request.headers.get("cf-connecting-ip");
-  if (cfIp) return cfIp.trim();
+
   return "127.0.0.1";
 }
 

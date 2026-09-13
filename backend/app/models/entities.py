@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from sqlalchemy import (
-    Column, String, Integer, Float, Boolean, DateTime, ForeignKey, Text
+    Column, String, Integer, Float, Boolean, DateTime, ForeignKey, Text, UniqueConstraint
 )
 from sqlalchemy.orm import relationship
 from backend.app.db.session import Base
@@ -72,6 +72,16 @@ class Challenge(Base):
     assigned_university_id = Column(String, ForeignKey("universities.id"), nullable=True)
     assigned_department = Column(String, nullable=True)
     view_count = Column(Integer, default=0)
+    
+    # Provenance Architecture (Citizen -> AI -> Government Official Decision)
+    citizen_reported_category = Column(String, nullable=True)
+    citizen_reported_severity = Column(String, nullable=True)
+    ai_predicted_category = Column(String, nullable=True)
+    ai_predicted_severity = Column(String, nullable=True)
+    ai_urgency_score = Column(Integer, nullable=True)
+    official_government_category = Column(String, nullable=True)
+    official_government_severity = Column(String, nullable=True)
+
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -143,6 +153,7 @@ class Milestone(Base):
 
 class Review(Base):
     __tablename__ = "reviews"
+    __table_args__ = (UniqueConstraint("reviewer_id", "solution_id", name="uq_reviewer_solution"),)
 
     id = Column(String, primary_key=True, default=generate_id)
     solution_id = Column(String, ForeignKey("solutions.id", ondelete="CASCADE"), nullable=False)

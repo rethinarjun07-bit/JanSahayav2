@@ -55,22 +55,44 @@ export async function POST(
       return NextResponse.json({ error: "Challenge not found" }, { status: 404 });
     }
 
+    // ── Ownership Authorization Check (Defense in Depth) ───────────────────
+    const isCreator = Boolean(userId && userId === challenge.createdById);
+    const isAdmin = Boolean(session?.role === "ADMIN");
+
+    if (!isCreator && !isAdmin) {
+      return NextResponse.json(
+        {
+          error: "Forbidden: Only the citizen who reported this challenge or an authorized Government Administrator can submit resolution verification feedback.",
+          code: "OWNERSHIP_REQUIRED",
+          challengeOwnerId: challenge.createdById,
+        },
+        { status: 403 }
+      );
+    }
+
     let newStatus = challenge.status;
     let newSlaStatus = challenge.slaStatus;
     let impactScore = challenge.impactScore || 80;
 
+    // Government verification state machine handling
     if (feedback === "SOLVED") {
-      newStatus = "SOLVED";
-      newSlaStatus = "ON_TRACK";
+      // Citizen marks on-ground resolution verified.
+      // If already in implementation/deployed, transitions to FIELD_VERIFIED / SOLVED.
+      if (["DEPLOYED", "PILOT_DEPLOYED", "IN_PROGRESS", "ASSIGNED", "VERIFIED"].includes(challenge.status)) {
+        newStatus = "FIELD_VERIFIED";
+      }
+      newSlaStatus = "RESOLVED";
       impactScore = Math.min(98, (satisfactionRating || 5) * 20);
     } else if (feedback === "NOT_SOLVED") {
-      // Reopen and escalate!
+      // Citizen indicates civic work failed or is incomplete - escalate for administrative intervention!
       newStatus = "ESCALATED";
       newSlaStatus = "ESCALATED";
       impactScore = Math.max(20, impactScore - 30);
     } else {
-      // PARTIALLY_SOLVED
-      newStatus = "IN_PROGRESS";
+      // PARTIALLY_SOLVED - keep in progress with notes
+      if (challenge.status === "FIELD_VERIFIED" || challenge.status === "SOLVED") {
+        newStatus = "IN_PROGRESS";
+      }
     }
 
     const updatedChallenge = await db.challenge.update({

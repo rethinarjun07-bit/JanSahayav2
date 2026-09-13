@@ -117,7 +117,15 @@ export function calculateHaversineDistanceKm(
   lat2: number,
   lon2: number
 ): number {
-  if (!lat1 || !lon1 || !lat2 || !lon2) return 999;
+  if (
+    typeof lat1 !== "number" || typeof lon1 !== "number" ||
+    typeof lat2 !== "number" || typeof lon2 !== "number" ||
+    isNaN(lat1) || isNaN(lon1) || isNaN(lat2) || isNaN(lon2) ||
+    lat1 < -90 || lat1 > 90 || lat2 < -90 || lat2 > 90 ||
+    lon1 < -180 || lon1 > 180 || lon2 < -180 || lon2 > 180
+  ) {
+    return 999;
+  }
   const R = 6371; // Earth's radius in km
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
@@ -143,6 +151,44 @@ export interface DuplicateCandidate {
   reasons: string[];
 }
 
+/**
+ * Computes explicit weighted term frequency for title (e.g. weight=2) and description (weight=1)
+ * without invisible text string duplication.
+ */
+export function computeWeightedDocumentTokens(
+  title: string,
+  description: string,
+  titleWeight: number = 2,
+  descriptionWeight: number = 1
+): { tokens: string[]; tf: Map<string, number> } {
+  const titleTokens = tokenize(title);
+  const descTokens = tokenize(description);
+
+  const tokenWeights = new Map<string, number>();
+  let totalWeightedTokens = 0;
+
+  for (const token of titleTokens) {
+    tokenWeights.set(token, (tokenWeights.get(token) || 0) + titleWeight);
+    totalWeightedTokens += titleWeight;
+  }
+
+  for (const token of descTokens) {
+    tokenWeights.set(token, (tokenWeights.get(token) || 0) + descriptionWeight);
+    totalWeightedTokens += descriptionWeight;
+  }
+
+  const tf = new Map<string, number>();
+  if (totalWeightedTokens > 0) {
+    for (const [token, weight] of tokenWeights.entries()) {
+      tf.set(token, weight / totalWeightedTokens);
+    }
+  }
+
+  // Tokens for vocabulary / IDF indexing
+  const tokens = Array.from(new Set([...titleTokens, ...descTokens]));
+  return { tokens, tf };
+}
+
 export function evaluateDuplicates(
   target: {
     title: string;
@@ -165,22 +211,21 @@ export function evaluateDuplicates(
   }>,
   threshold: number = 0.40
 ): DuplicateCandidate[] {
-  const targetText = `${target.title} ${target.title} ${target.description}`;
-  const targetTokens = tokenize(targetText);
-  const targetTF = computeTF(targetTokens);
+  // Title weight = 2, Description weight = 1 (explicit weighting)
+  const targetDoc = computeWeightedDocumentTokens(target.title, target.description, 2, 1);
+  const corpusDocs = corpus.map((c) => computeWeightedDocumentTokens(c.title, c.description, 2, 1));
 
-  const corpusTokenDocs = corpus.map((c) => tokenize(`${c.title} ${c.title} ${c.description}`));
-  corpusTokenDocs.push(targetTokens);
-  const idf = computeIDF(corpusTokenDocs);
+  const allTokenDocs = corpusDocs.map((d) => d.tokens);
+  allTokenDocs.push(targetDoc.tokens);
+  const idf = computeIDF(allTokenDocs);
 
   const candidates: DuplicateCandidate[] = [];
 
   for (let i = 0; i < corpus.length; i++) {
     const item = corpus[i];
-    const itemTokens = corpusTokenDocs[i];
-    const itemTF = computeTF(itemTokens);
+    const itemDoc = corpusDocs[i];
 
-    const { score: rawCosine, commonKeywords } = cosineSimilarity(targetTF, itemTF, idf);
+    const { score: rawCosine, commonKeywords } = cosineSimilarity(targetDoc.tf, itemDoc.tf, idf);
     const reasons: string[] = [];
 
     // 1. Text similarity
@@ -224,7 +269,10 @@ export function evaluateDuplicates(
       );
       if (diffDays <= 7) {
         finalScore += 0.08;
-        reasons.push("Reported within 7 days of each other");
+        reasons.push("Reported within 7 days of each other (+8%)");
+      } else if (diffDays <= 30) {
+        finalScore += 0.04;
+        reasons.push("Reported within 30 days of each other (+4%)");
       }
     }
 
@@ -321,7 +369,7 @@ export function detectCivicClusters(
         urgencyScore: Math.min(98, maxUrgency + group.length * 3),
         challengeIds: group.map((c) => c.id),
         challengeTitles: group.map((c) => c.title),
-        approximateAffectedPopulation: `Estimated ~${group.length * 450} to ${group.length * 1200} citizens in 2.5km vicinity`,
+        approximateAffectedPopulation: `Preliminary impact estimate: ~${group.length * 450} to ${group.length * 1200} citizens in 2.5km vicinity (preliminary geographic density heuristic; subject to statutory census/GIS calibration)`,
       });
     }
   }

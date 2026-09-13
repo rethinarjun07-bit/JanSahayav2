@@ -403,6 +403,13 @@ async function main() {
       verifiedById: adminUser.id,
       officialNotes: "Verified on-site by District Triage Officer. Severe drainage constriction confirmed. Assigned to BIT Mesra Hydrology Division for LiDAR runoff modeling.",
       viewCount: 342,
+      citizenReportedCategory: "Disaster Management",
+      citizenReportedSeverity: "CRITICAL",
+      aiPredictedCategory: "Disaster Management",
+      aiPredictedSeverity: "CRITICAL",
+      aiUrgencyScore: 92,
+      officialGovernmentCategory: "Disaster Management",
+      officialGovernmentSeverity: "CRITICAL",
     },
   });
 
@@ -933,6 +940,13 @@ async function main() {
         verifiedById: adminUser.id,
         officialNotes: "Assigned for technical intervention following preliminary district vulnerability audit.",
         viewCount: Math.floor(Math.random() * 200) + 50,
+        citizenReportedCategory: item.cat,
+        citizenReportedSeverity: item.sev,
+        aiPredictedCategory: item.cat,
+        aiPredictedSeverity: item.sev,
+        aiUrgencyScore: item.urg,
+        officialGovernmentCategory: item.cat,
+        officialGovernmentSeverity: item.sev,
       },
     });
   }

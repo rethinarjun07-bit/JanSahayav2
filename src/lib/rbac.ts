@@ -86,6 +86,23 @@ export function requireRole(
 }
 
 /**
+ * Asserts that the authenticated session is an authorized Government ADMIN.
+ */
+export function requireAdmin(session: TokenPayload | null): NextResponse | null {
+  return requireRole(session, "ADMIN");
+}
+
+/**
+ * Asserts that the authenticated session has any of the specified roles.
+ */
+export function requireAnyRole(
+  session: TokenPayload | null,
+  ...allowedRoles: AppRole[]
+): NextResponse | null {
+  return requireRole(session, ...allowedRoles);
+}
+
+/**
  * Checks whether a given role is allowed to access a protected page path.
  */
 export function canAccessRoute(role: string | undefined, pathname: string): boolean {

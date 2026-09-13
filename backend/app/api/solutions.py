@@ -222,9 +222,31 @@ def add_review(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    if current_user.role not in ["SOLVER", "INDUSTRY", "ADMIN"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Only Technical Evaluators (SOLVER, INDUSTRY, ADMIN) can submit proposal reviews."
+        )
+
     solution = db.query(Solution).filter(Solution.id == id).first()
     if not solution:
         raise HTTPException(status_code=404, detail="Solution not found")
+
+    if solution.author_id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Solvers and proposal authors cannot review their own proposals."
+        )
+
+    existing_review = db.query(Review).filter(
+        Review.solution_id == id,
+        Review.reviewer_id == current_user.id
+    ).first()
+    if existing_review:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Conflict: You have already submitted a review for this proposal."
+        )
 
     review = Review(
         solution_id=id,

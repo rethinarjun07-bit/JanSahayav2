@@ -1,5 +1,5 @@
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -21,11 +21,11 @@ model User {
   state           String?
   bio             String?
   skills          String?          // JSON array of strings
-  karmaPoints     Int              @default(100)
+  karmaPoints     Int              @default(100) @map("karma_points")
   badges          String?          // JSON array of badge objects
-  isVerified      Boolean          @default(true)
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  isVerified      Boolean          @default(true) @map("is_verified")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
 
   challenges      Challenge[]      @relation("CreatedChallenges")
   solutions       Solution[]       @relation("CreatedSolutions")
@@ -34,167 +34,203 @@ model User {
   upvotes         Upvote[]
   notifications   Notification[]
   auditLogs       AuditLog[]
+
+  @@map("users")
 }
 
 model Challenge {
-  id                      String           @id @default(cuid())
-  title                   String
-  description             String
-  category                String           // Disaster Management, Water & Sanitation, Mining & Geology, Infrastructure, etc.
-  severity                String           @default("MEDIUM") // LOW, MEDIUM, HIGH, CRITICAL
-  urgencyScore            Int              @default(50) // 1-100
-  status                  String           @default("SUBMITTED") // SUBMITTED, VERIFIED, ASSIGNED, IN_PROGRESS, SOLVED, REJECTED, MERGED
-  latitude                Float
-  longitude               Float
-  address                 String
-  district                String
-  state                   String
-  pincode                 String?
-  mediaUrls               String?          // JSON array of strings
-  audioUrl                String?
-  voiceTranscript         String?
-  language                String           @default("en")
-  masterChallengeId       String?
-  isMaster                Boolean          @default(false)
-  duplicateScore          Float?
-  aiTags                  String?          // JSON array of strings
-  predictedSector         String?
-  autoAssignedUniversity  String?
-  officialNotes           String?
-  verifiedAt              DateTime?
-  verifiedById            String?
-  assignedUniversityId    String?
-  assignedDepartment      String?
-  viewCount               Int              @default(0)
-  confidenceScore         Int              @default(85) // 0-100%
-  duplicateProbability    Int              @default(0)  // 0-100%
-  evidenceStrength        Int              @default(75) // 0-100%
-  priorityScore           Int              @default(60) // 0-100%
-  recommendedDepartment   String?          // e.g. PHED, Disaster Management, Road Construction
-  slaDeadline             DateTime?
-  slaStatus               String           @default("ON_TRACK") // ON_TRACK, APPROACHING, BREACHED, ESCALATED
-  sdgGoals                String?          // JSON array of UN SDG strings
-  selectedSolutionId      String?
-  citizenFeedback         String?          // SOLVED, PARTIALLY_SOLVED, NOT_SOLVED
-  citizenFeedbackNotes    String?
-  impactScore             Int?             // 0-100
-  beneficiariesCount      Int              @default(0)
-  createdAt               DateTime         @default(now())
-  updatedAt               DateTime         @updatedAt
+  id                          String           @id @default(cuid())
+  title                       String
+  description                 String
+  category                    String           // Disaster Management, Water & Sanitation, Mining & Geology, Infrastructure, etc.
+  severity                    String           @default("MEDIUM") // LOW, MEDIUM, HIGH, CRITICAL
+  urgencyScore                Int              @default(50) @map("urgency_score") // 1-100
+  status                      String           @default("SUBMITTED") // SUBMITTED, AI_ANALYZED, GOVERNMENT_REVIEW, VERIFIED, ASSIGNED, IN_PROGRESS, SOLVED, REJECTED, MERGED, ESCALATED
+  latitude                    Float
+  longitude                   Float
+  address                     String
+  district                    String
+  state                       String
+  pincode                     String?
+  mediaUrls                   String?          @map("media_urls") // JSON array of strings
+  audioUrl                    String?          @map("audio_url")
+  voiceTranscript             String?          @map("voice_transcript")
+  language                    String           @default("en")
+  masterChallengeId           String?          @map("master_challenge_id")
+  isMaster                    Boolean          @default(false) @map("is_master")
+  duplicateScore              Float?           @map("duplicate_score")
+  aiTags                      String?          @map("ai_tags") // JSON array of strings
+  predictedSector             String?          @map("predicted_sector")
+  autoAssignedUniversity      String?          @map("auto_assigned_university")
+  officialNotes               String?          @map("official_notes")
+  verifiedAt                  DateTime?        @map("verified_at")
+  verifiedById                String?          @map("verified_by_id")
+  assignedUniversityId        String?          @map("assigned_university_id")
+  assignedDepartment          String?          @map("assigned_department")
+  viewCount                   Int              @default(0) @map("view_count")
+  confidenceScore             Int              @default(85) @map("confidence_score") // 0-100%
+  duplicateProbability        Int              @default(0) @map("duplicate_probability") // 0-100%
+  evidenceStrength            Int              @default(75) @map("evidence_strength") // 0-100%
+  priorityScore               Int              @default(60) @map("priority_score") // 0-100%
+  recommendedDepartment       String?          @map("recommended_department")
+  slaDeadline                 DateTime?        @map("sla_deadline")
+  slaStatus                   String           @default("ON_TRACK") @map("sla_status") // ON_TRACK, APPROACHING, BREACHED, ESCALATED, RESOLVED
+  sdgGoals                    String?          @map("sdg_goals") // JSON array of UN SDG strings
+  selectedSolutionId          String?          @map("selected_solution_id")
+  citizenFeedback             String?          @map("citizen_feedback") // SOLVED, PARTIALLY_SOLVED, NOT_SOLVED
+  citizenFeedbackNotes        String?          @map("citizen_feedback_notes")
+  impactScore                 Int?             @map("impact_score") // 0-100
+  beneficiariesCount          Int              @default(0) @map("beneficiaries_count")
 
-  createdById             String
-  createdBy               User             @relation("CreatedChallenges", fields: [createdById], references: [id], onDelete: Cascade)
+  // Provenance Architecture (Citizen -> AI -> Government Official Decision)
+  citizenReportedCategory     String?          @map("citizen_reported_category")
+  citizenReportedSeverity     String?          @map("citizen_reported_severity")
+  aiPredictedCategory         String?          @map("ai_predicted_category")
+  aiPredictedSeverity         String?          @map("ai_predicted_severity")
+  aiUrgencyScore              Int?             @map("ai_urgency_score")
+  officialGovernmentCategory  String?          @map("official_government_category")
+  officialGovernmentSeverity  String?          @map("official_government_severity")
 
-  // Self relation for duplicate merging
-  masterChallenge         Challenge?       @relation("DuplicateHierarchy", fields: [masterChallengeId], references: [id])
-  duplicates              Challenge[]      @relation("DuplicateHierarchy")
+  createdAt                   DateTime         @default(now()) @map("created_at")
+  updatedAt                   DateTime         @updatedAt @map("updated_at")
 
-  solutions               Solution[]
-  upvotes                 Upvote[]
-  comments                Comment[]
+  createdById                 String           @map("created_by_id")
+  createdBy                   User             @relation("CreatedChallenges", fields: [createdById], references: [id], onDelete: Cascade)
+
+  // Self relation for duplicate hierarchy
+  masterChallenge             Challenge?       @relation("DuplicateHierarchy", fields: [masterChallengeId], references: [id])
+  duplicates                  Challenge[]      @relation("DuplicateHierarchy")
+
+  solutions                   Solution[]
+  upvotes                     Upvote[]
+  comments                    Comment[]
+
+  @@index([status])
+  @@index([category])
+  @@index([district])
+  @@index([createdById])
+  @@index([createdAt])
+  @@index([assignedUniversityId])
+  @@map("challenges")
 }
 
 model DuplicateMerge {
   id                     String           @id @default(cuid())
-  masterChallengeId      String
-  duplicateChallengeId   String
-  similarityScore        Float
+  masterChallengeId      String           @map("master_challenge_id")
+  duplicateChallengeId   String           @map("duplicate_challenge_id")
+  similarityScore        Float            @map("similarity_score")
   reason                 String
-  mergedById             String
-  mergedAt               DateTime         @default(now())
+  mergedById             String           @map("merged_by_id")
+  mergedAt               DateTime         @default(now()) @map("merged_at")
+
+  @@map("duplicate_merges")
 }
 
 model Solution {
-  id                String           @id @default(cuid())
-  challengeId       String
-  challenge         Challenge        @relation(fields: [challengeId], references: [id], onDelete: Cascade)
-  authorId          String
-  author            User             @relation("CreatedSolutions", fields: [authorId], references: [id], onDelete: Cascade)
+  id                      String           @id @default(cuid())
+  challengeId             String           @map("challenge_id")
+  challenge               Challenge        @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  authorId                String           @map("author_id")
+  author                  User             @relation("CreatedSolutions", fields: [authorId], references: [id], onDelete: Cascade)
 
-  teamName          String?
-  title             String
-  abstract          String
-  methodology       String
-  techStack         String?          // JSON array of strings
-  budgetEstimate    Float?
-  timelineMonths    Int?
-  prototypeUrl      String?
-  mediaUrls         String?          // JSON array of strings
-  status            String           @default("PROPOSED") // DRAFT, PROPOSED, MENTOR_REVIEW, PILOT_DEPLOYED, GOVT_VERIFIED, DEPLOYED
-  milestoneStage    String           @default("Phase 1: Conceptualization")
-  govtEndorsed      Boolean          @default(false)
-  endorsedBy        String?
-  endorsedAt        DateTime?
-  aiRecommendationVerdict String?    // RECOMMENDED, FEASIBLE, ALTERNATIVE
-  feasibilityScore  Float            @default(4.0)
-  costEffectivenessScore Float       @default(4.0)
-  csrFundingStatus  String           @default("UNFUNDED") // UNFUNDED, PLEDGED, FUNDED
-  csrFunderName     String?
-  csrAmountPledged  Float?
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
+  teamName                String?          @map("team_name")
+  title                   String
+  abstract                String
+  methodology             String
+  techStack               String?          @map("tech_stack") // JSON array of strings
+  budgetEstimate          Float?           @map("budget_estimate")
+  timelineMonths          Int?             @map("timeline_months")
+  prototypeUrl            String?          @map("prototype_url")
+  mediaUrls               String?          @map("media_urls") // JSON array of strings
+  status                  String           @default("PROPOSED") // DRAFT, PROPOSED, MENTOR_REVIEW, PILOT_DEPLOYED, GOVT_VERIFIED, DEPLOYED
+  milestoneStage          String           @default("Phase 1: Conceptualization") @map("milestone_stage")
+  govtEndorsed            Boolean          @default(false) @map("govt_endorsed")
+  endorsedBy              String?          @map("endorsed_by")
+  endorsedAt              DateTime?        @map("endorsed_at")
+  aiRecommendationVerdict String?          @map("ai_recommendation_verdict") // RECOMMENDED, FEASIBLE, ALTERNATIVE
+  feasibilityScore        Float            @default(4.0) @map("feasibility_score")
+  costEffectivenessScore  Float            @default(4.0) @map("cost_effectiveness_score")
+  csrFundingStatus        String           @default("UNFUNDED") @map("csr_funding_status") // UNFUNDED, PLEDGED, FUNDED
+  csrFunderName           String?          @map("csr_funder_name")
+  csrAmountPledged        Float?           @map("csr_amount_pledged")
+  createdAt               DateTime         @default(now()) @map("created_at")
+  updatedAt               DateTime         @updatedAt @map("updated_at")
 
-  milestones        Milestone[]
-  reviews           Review[]
-  upvotes           Upvote[]
-  comments          Comment[]
+  milestones              Milestone[]
+  reviews                 Review[]
+  upvotes                 Upvote[]
+  comments                Comment[]
+
+  @@index([challengeId])
+  @@index([authorId])
+  @@index([status])
+  @@map("solutions")
 }
 
 model Milestone {
   id             String           @id @default(cuid())
-  solutionId     String
+  solutionId     String           @map("solution_id")
   solution       Solution         @relation(fields: [solutionId], references: [id], onDelete: Cascade)
   order          Int
   title          String
   description    String
-  targetDate     DateTime?
+  targetDate     DateTime?        @map("target_date")
   status         String           @default("PENDING") // PENDING, SUBMITTED, APPROVED, REJECTED
-  proofUrl       String?
+  proofUrl       String?          @map("proof_url")
   notes          String?
-  updatedAt      DateTime         @updatedAt
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  @@map("milestones")
 }
 
 model Review {
   id                 String           @id @default(cuid())
-  solutionId         String
+  solutionId         String           @map("solution_id")
   solution           Solution         @relation(fields: [solutionId], references: [id], onDelete: Cascade)
-  reviewerId         String
+  reviewerId         String           @map("reviewer_id")
   reviewer           User             @relation(fields: [reviewerId], references: [id], onDelete: Cascade)
   role               String           // MENTOR, INDUSTRY, GOVT_NODAL
   rating             Float            // 1 to 5
-  feasibilityScore   Float            @default(4.0)
-  impactScore        Float            @default(4.0)
-  costEffectiveness  Float            @default(4.0)
-  scalabilityScore   Float            @default(4.0)
+  feasibilityScore   Float            @default(4.0) @map("feasibility_score")
+  impactScore        Float            @default(4.0) @map("impact_score")
+  costEffectiveness  Float            @default(4.0) @map("cost_effectiveness")
+  scalabilityScore   Float            @default(4.0) @map("scalability_score")
   feedback           String
-  createdAt          DateTime         @default(now())
+  createdAt          DateTime         @default(now()) @map("created_at")
+
+  // Prevent duplicate reviews for the same proposal from the same reviewer
+  @@unique([reviewerId, solutionId])
+  @@map("reviews")
 }
 
 model Upvote {
   id             String           @id @default(cuid())
-  userId         String
+  userId         String           @map("user_id")
   user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  challengeId    String?
+  challengeId    String?          @map("challenge_id")
   challenge      Challenge?       @relation(fields: [challengeId], references: [id], onDelete: Cascade)
-  solutionId     String?
+  solutionId     String?          @map("solution_id")
   solution       Solution?        @relation(fields: [solutionId], references: [id], onDelete: Cascade)
-  createdAt      DateTime         @default(now())
+  createdAt      DateTime         @default(now()) @map("created_at")
 
   @@unique([userId, challengeId])
   @@unique([userId, solutionId])
+  @@map("upvotes")
 }
 
 model Comment {
   id             String           @id @default(cuid())
   content        String
-  userId         String
+  userId         String           @map("user_id")
   user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  challengeId    String?
+  challengeId    String?          @map("challenge_id")
   challenge      Challenge?       @relation(fields: [challengeId], references: [id], onDelete: Cascade)
-  solutionId     String?
+  solutionId     String?          @map("solution_id")
   solution       Solution?        @relation(fields: [solutionId], references: [id], onDelete: Cascade)
-  audioUrl       String?
-  createdAt      DateTime         @default(now())
+  audioUrl       String?          @map("audio_url")
+  createdAt      DateTime         @default(now()) @map("created_at")
+
+  @@map("comments")
 }
 
 model University {
@@ -204,34 +240,40 @@ model University {
   state               String
   district            String
   departments         String           // JSON array of strings
-  expertiseTags       String           // JSON array of strings
-  nodalOfficerName    String
-  nodalOfficerEmail   String
-  logoUrl             String?
+  expertiseTags       String           @map("expertise_tags") // JSON array of strings
+  nodalOfficerName    String           @map("nodal_officer_name")
+  nodalOfficerEmail   String           @map("nodal_officer_email")
+  logoUrl             String?          @map("logo_url")
+
+  @@map("universities")
 }
 
 model Notification {
   id             String           @id @default(cuid())
-  userId         String
+  userId         String           @map("user_id")
   user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   title          String
   message        String
   type           String           @default("INFO") // INFO, SUCCESS, WARNING, BADGE_EARNED, DUPLICATE_ALERT
   link           String?
-  isRead         Boolean          @default(false)
-  createdAt      DateTime         @default(now())
+  isRead         Boolean          @default(false) @map("is_read")
+  createdAt      DateTime         @default(now()) @map("created_at")
+
+  @@map("notifications")
 }
 
 model AuditLog {
   id             String           @id @default(cuid())
   action         String
-  entityType     String
-  entityId       String
-  actorId        String
+  entityType     String           @map("entity_type")
+  entityId       String           @map("entity_id")
+  actorId        String           @map("actor_id")
   user           User             @relation(fields: [actorId], references: [id], onDelete: Cascade)
-  actorName      String
+  actorName      String           @map("actor_name")
   details        String?          // JSON
-  createdAt      DateTime         @default(now())
+  createdAt      DateTime         @default(now()) @map("created_at")
+
+  @@map("audit_logs")
 }
 
 model CivicCluster {
@@ -241,10 +283,12 @@ model CivicCluster {
   district       String
   latitude       Float
   longitude      Float
-  radiusKm       Float            @default(2.5)
-  reportCount    Int              @default(1)
-  urgencyScore   Int              @default(70)
-  challengeIds   String           // JSON array of challenge IDs
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  radiusKm       Float            @default(2.5) @map("radius_km")
+  reportCount    Int              @default(1) @map("report_count")
+  urgencyScore   Int              @default(70) @map("urgency_score")
+  challengeIds   String           @map("challenge_ids") // JSON array of challenge IDs
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  @@map("civic_clusters")
 }

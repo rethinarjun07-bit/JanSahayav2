@@ -82,6 +82,14 @@ def login(req: LoginRequest, response: Response, db: Session = Depends(get_db)):
 
 @router.post("/register")
 def register(req: RegisterRequest, response: Response, db: Session = Depends(get_db)):
+    requested_role = req.role.upper().strip()
+    allowed_roles = ["CITIZEN", "SOLVER", "INDUSTRY"]
+    if requested_role == "ADMIN" or requested_role not in allowed_roles:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Government Authority (ADMIN) accounts cannot be self-registered via public endpoints."
+        )
+
     existing = db.query(User).filter(User.email == req.email.lower().strip()).first()
     if existing:
         raise HTTPException(status_code=400, detail="User with this email already exists")
@@ -90,7 +98,7 @@ def register(req: RegisterRequest, response: Response, db: Session = Depends(get
         email=req.email.lower().strip(),
         password=get_password_hash(req.password),
         name=req.name,
-        role=req.role.upper(),
+        role=requested_role,
         organization=req.organization,
         designation=req.designation,
         phone=req.phone,

@@ -41,6 +41,8 @@ export async function POST(request: Request) {
         severity: verifiedSeverity || challenge.severity,
         assignedUniversityId: assignedUniversityId || challenge.assignedUniversityId,
         assignedDepartment: assignedDepartment || challenge.assignedDepartment,
+        officialGovernmentSeverity: verifiedSeverity || challenge.severity,
+        officialGovernmentCategory: challenge.category,
         verifiedAt: new Date(),
         verifiedById: adminId,
       },
@@ -71,7 +73,13 @@ export async function POST(request: Request) {
         entityId: challengeId,
         actorId: adminId,
         actorName: adminUser?.name || "Govt Triage Officer",
-        details: JSON.stringify({ status, notes: officialNotes, severity: verifiedSeverity }),
+        details: JSON.stringify({
+          previousStatus: challenge.status,
+          newStatus: status,
+          notes: officialNotes,
+          previousSeverity: challenge.severity,
+          verifiedSeverity: verifiedSeverity || challenge.severity,
+        }),
       },
     });
 

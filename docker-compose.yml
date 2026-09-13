@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # 1. PostgreSQL Database — Private container network; localhost-bound for local management only
+  # 1. PostgreSQL Database — Single Source of Truth
   db:
     image: postgres:16-alpine
     container_name: jansahaya-postgres
@@ -20,7 +20,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # 2. Python (FastAPI) Backend & AI Services
+  # 2. Python (FastAPI) Backend & Specialized AI/NLP Services
   backend:
     build:
       context: .
@@ -30,7 +30,7 @@ services:
     ports:
       - "127.0.0.1:8000:8000"
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-jansahaya}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-jansahaya}?schema=public
       JWT_SECRET: ${JWT_SECRET}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       PYTHONUNBUFFERED: "1"
@@ -41,7 +41,7 @@ services:
       db:
         condition: service_healthy
 
-  # 3. Next.js Frontend
+  # 3. Next.js Frontend & Core Application
   frontend:
     image: node:20-alpine
     container_name: jansahaya-react
@@ -53,15 +53,19 @@ services:
     ports:
       - "3000:3000"
     environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-jansahaya}?schema=public
       FASTAPI_BACKEND_URL: http://backend:8000
       PORT: "3000"
       JWT_SECRET: ${JWT_SECRET}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       DEMO_MODE: ${DEMO_MODE:-true}
       NEXT_PUBLIC_DEMO_MODE: ${NEXT_PUBLIC_DEMO_MODE:-true}
-    command: sh -c "npm install && npm run dev"
+    command: sh -c "npx prisma generate && npm run dev"
     depends_on:
-      - backend
+      db:
+        condition: service_healthy
+      backend:
+        condition: service_started
 
 volumes:
   postgres_data:

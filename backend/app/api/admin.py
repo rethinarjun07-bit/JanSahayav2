@@ -14,7 +14,7 @@ router = APIRouter(prefix="/admin", tags=["Admin Government Operations"])
 @router.post("/verify")
 def verify_challenge(
     req: VerifyRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles(["ADMIN"])),
     db: Session = Depends(get_db)
 ):
     challenge = db.query(Challenge).filter(Challenge.id == req.challengeId).first()
@@ -56,7 +56,7 @@ def verify_challenge(
 @router.post("/assign")
 def assign_university(
     req: AssignRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles(["ADMIN"])),
     db: Session = Depends(get_db)
 ):
     challenge = db.query(Challenge).filter(Challenge.id == req.challengeId).first()
@@ -98,7 +98,7 @@ def assign_university(
 @router.post("/merge")
 def merge_duplicates(
     req: MergeRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles(["ADMIN"])),
     db: Session = Depends(get_db)
 ):
     master = db.query(Challenge).filter(Challenge.id == req.masterChallengeId).first()
