@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import db from "@/lib/db";
-import { getUserFromRequest } from "@/lib/auth";
+import { getUserFromRequest, hashPassword } from "@/lib/auth";
 import { getClientIp, checkRateLimit, createRateLimitResponse, RATE_LIMIT_BUCKETS } from "@/lib/rate-limiter";
 import { classifyChallenge } from "@/lib/nlp/classifier";
+import crypto from "crypto";
 
 const SIMULATED_TEMPLATES = [
   {
@@ -73,11 +74,12 @@ export async function POST(request: NextRequest) {
     });
 
     if (!citizenUser) {
+      const secureRandomPassword = await hashPassword(crypto.randomBytes(32).toString("hex"));
       citizenUser = await db.user.create({
         data: {
           name: "Suresh Mahto (Field Volunteer)",
           email: `volunteer.${Date.now()}@jharkhand.gov.in`,
-          password: "demo",
+          password: secureRandomPassword,
           role: "CITIZEN",
           district: "Ranchi",
           state: "Jharkhand",

@@ -3,11 +3,16 @@ import db from "@/lib/db";
 import { getUserFromRequest } from "@/lib/auth";
 import { requireRole } from "@/lib/rbac";
 import { SolutionSchema } from "@/lib/validators";
+import { transitionChallengeStatus } from "@/lib/lifecycle";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
+    const session = await getUserFromRequest(request);
+    const isAdmin = session?.role === "ADMIN";
+    const currentUserId = session?.userId;
+
     const { searchParams } = new URL(request.url);
     const challengeId = searchParams.get("challengeId");
     const authorId = searchParams.get("authorId");
@@ -15,6 +20,18 @@ export async function GET(request: Request) {
     const where: Record<string, unknown> = {};
     if (challengeId) where.challengeId = challengeId;
     if (authorId) where.authorId = authorId;
+
+    // Phase 5: Draft solutions must only be visible to author or ADMIN
+    if (!isAdmin) {
+      if (currentUserId) {
+        where.OR = [
+          { status: { not: "DRAFT" } },
+          { authorId: currentUserId },
+        ];
+      } else {
+        where.status = { not: "DRAFT" };
+      }
+    }
 
     const solutions = await db.solution.findMany({
       where,
@@ -75,6 +92,41 @@ export async function POST(request: Request) {
 
     const data = result.data;
 
+    // ── Challenge Lifecycle Validation ──────────────────────────────────────
+    const challenge = await db.challenge.findUnique({
+      where: { id: data.challengeId },
+    });
+
+    if (!challenge) {
+      return NextResponse.json({ error: "Challenge not found" }, { status: 404 });
+    }
+
+    // Only allow submitting active solutions if challenge is in an active lifecycle state
+    // (e.g. ASSIGNED, VERIFIED, or already IN_PROGRESS).
+    // If challenge is SUBMITTED, REJECTED, MERGED, SOLVED, or CLOSED, reject with 409 Conflict.
+    if (challenge.status !== "IN_PROGRESS") {
+      const transitionCheck = await transitionChallengeStatus({
+        challengeId: data.challengeId,
+        toStatus: "IN_PROGRESS",
+        actor: {
+          userId: authorId,
+          name: session!.name,
+          role: session!.role,
+        },
+        notes: `Solution proposal '${data.title}' submitted by solver.`,
+      });
+
+      if (!transitionCheck.success) {
+        return NextResponse.json(
+          {
+            error: transitionCheck.error || "Invalid challenge lifecycle transition for solution submission.",
+            code: transitionCheck.code || "INVALID_LIFECYCLE_TRANSITION",
+          },
+          { status: transitionCheck.statusHttp || 409 }
+        );
+      }
+    }
+
     const solution = await db.solution.create({
       data: {
         challengeId: data.challengeId,
@@ -119,12 +171,6 @@ export async function POST(request: Request) {
     await db.user.update({
       where: { id: authorId },
       data: { karmaPoints: { increment: 50 } },
-    });
-
-    // Update challenge status to IN_PROGRESS
-    await db.challenge.update({
-      where: { id: data.challengeId },
-      data: { status: "IN_PROGRESS" },
     });
 
     const authorUser = await db.user.findUnique({ where: { id: authorId } });

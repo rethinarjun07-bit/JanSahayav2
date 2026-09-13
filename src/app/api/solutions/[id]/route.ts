@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { getUserFromRequest } from "@/lib/auth";
+import { isValidSolutionTransition } from "@/lib/lifecycle";
 
 export async function GET(
   request: Request,
@@ -42,6 +43,16 @@ export async function GET(
     });
 
     if (!solution) {
+      return NextResponse.json({ error: "Solution not found" }, { status: 404 });
+    }
+
+    // Phase 5: Draft solutions must only be visible to author or ADMIN
+    // Return 404 to avoid leaking existence of private draft
+    const session = await getUserFromRequest(request);
+    const isAuthor = session?.userId === solution.authorId;
+    const isAdmin = session?.role === "ADMIN";
+
+    if (solution.status === "DRAFT" && !isAuthor && !isAdmin) {
       return NextResponse.json({ error: "Solution not found" }, { status: 404 });
     }
 
@@ -113,16 +124,17 @@ export async function PUT(
     const govtEndorsed = isAdmin && typeof body.govtEndorsed === "boolean" ? body.govtEndorsed : existingSolution.govtEndorsed;
     const endorsedBy = isAdmin && body.endorsedBy ? body.endorsedBy : existingSolution.endorsedBy;
 
-    // Authors cannot elevate their solution to GOVT_VERIFIED or DEPLOYED
+    // Validate solution lifecycle transition and role authority
     let newStatus = existingSolution.status;
-    if (body.status) {
-      if (!isAdmin && ["GOVT_VERIFIED", "DEPLOYED"].includes(body.status)) {
+    if (body.status && body.status !== existingSolution.status) {
+      const transitionCheck = isValidSolutionTransition(existingSolution.status, body.status, session.role);
+      if (!transitionCheck.valid) {
         return NextResponse.json(
           {
-            error: "Forbidden: Only Authorized Government Authorities can mark a solution as GOVT_VERIFIED or DEPLOYED.",
-            code: "INSUFFICIENT_PRIVILEGES",
+            error: transitionCheck.error || `Invalid solution transition from '${existingSolution.status}' to '${body.status}'.`,
+            code: "INVALID_SOLUTION_TRANSITION",
           },
-          { status: 403 }
+          { status: transitionCheck.error?.includes("Forbidden") ? 403 : 409 }
         );
       }
       newStatus = body.status;

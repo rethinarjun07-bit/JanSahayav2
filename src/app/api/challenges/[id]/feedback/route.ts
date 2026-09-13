@@ -4,6 +4,7 @@ import { getUserFromRequest } from "@/lib/auth";
 import { CitizenFeedbackSchema } from "@/lib/validators";
 import { getClientIp, checkRateLimit, createRateLimitResponse, RATE_LIMIT_BUCKETS } from "@/lib/rate-limiter";
 import { safeLog } from "@/lib/safe-logger";
+import { isValidChallengeTransition } from "@/lib/lifecycle";
 
 export async function POST(
   request: Request,
@@ -93,6 +94,14 @@ export async function POST(
       if (challenge.status === "FIELD_VERIFIED" || challenge.status === "SOLVED") {
         newStatus = "IN_PROGRESS";
       }
+    if (newStatus !== challenge.status && !isValidChallengeTransition(challenge.status, newStatus)) {
+      return NextResponse.json(
+        {
+          error: `Invalid lifecycle transition: Cannot transition challenge from '${challenge.status}' to '${newStatus}'.`,
+          code: "INVALID_LIFECYCLE_TRANSITION",
+        },
+        { status: 409 }
+      );
     }
 
     const updatedChallenge = await db.challenge.update({

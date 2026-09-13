@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { getUserFromRequest } from "@/lib/auth";
+import { transitionChallengeStatus } from "@/lib/lifecycle";
 
 export async function POST(
   request: Request,
@@ -69,13 +70,29 @@ export async function POST(
       // When solution is officially endorsed and deployed, challenge advances to DEPLOYED
       // (Government endorsement != field resolution; remains DEPLOYED until field verification)
       if (newStatus === "DEPLOYED" || newStatus === "GOVT_VERIFIED") {
-        await db.challenge.update({
-          where: { id: solution.challengeId },
-          data: {
-            status: "DEPLOYED",
+        const transition = await transitionChallengeStatus({
+          challengeId: solution.challengeId,
+          toStatus: "DEPLOYED",
+          actor: {
+            userId: endorserId,
+            name: endorserName,
+            role: session.role,
+          },
+          notes: remarks || `Officially endorsed via solution '${solution.title}'`,
+          additionalData: {
             selectedSolutionId: solution.id,
           },
         });
+
+        if (!transition.success) {
+          return NextResponse.json(
+            {
+              error: transition.error || "Invalid challenge lifecycle transition for endorsement.",
+              code: transition.code || "INVALID_LIFECYCLE_TRANSITION",
+            },
+            { status: transition.statusHttp || 409 }
+          );
+        }
       }
 
       // Create Notification

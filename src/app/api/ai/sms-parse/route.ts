@@ -12,7 +12,19 @@ import crypto from "crypto";
 export async function POST(request: NextRequest) {
   try {
     // ── 1. Webhook Authentication Gate ──────────────────────────────────────
-    const webhookSecret = process.env.SMS_WEBHOOK_SECRET || process.env.SMS_GATEWAY_KEY || "jansahaya-sih-sms-webhook-secure-key";
+    const webhookSecret = process.env.SMS_WEBHOOK_SECRET || process.env.SMS_GATEWAY_KEY;
+
+    if (!webhookSecret) {
+      safeLog.error("SMS Gateway Webhook: SMS_WEBHOOK_SECRET is not configured in environment.");
+      return NextResponse.json(
+        {
+          error: "Server configuration error: SMS Webhook secret is not configured.",
+          code: "WEBHOOK_CONFIG_MISSING",
+        },
+        { status: 500 }
+      );
+    }
+
     const providedSecret =
       request.headers.get("x-sms-webhook-secret") ||
       request.headers.get("x-webhook-token") ||

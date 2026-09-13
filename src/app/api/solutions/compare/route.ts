@@ -15,6 +15,17 @@ export async function GET(request: Request) {
       );
     }
 
+    // Phase 4: Solution comparison is restricted to Admin, Government officials, Industry, and Solvers
+    if (session.role === "CITIZEN") {
+      return NextResponse.json(
+        {
+          error: "Forbidden: Citizen accounts do not have permission to access technical proposal evaluations.",
+          code: "INSUFFICIENT_PRIVILEGES",
+        },
+        { status: 403 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const challengeId = searchParams.get("challengeId");
 

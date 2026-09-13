@@ -19,8 +19,29 @@ export async function GET(request: Request) {
     const challengeId = searchParams.get("challengeId");
     const solverId = searchParams.get("solverId");
 
+    // ── RBAC Authorization Gate ──────────────────────────────────────────────
+    const isAdmin = session.role === "ADMIN";
+    const isIndustry = session.role === "INDUSTRY";
+    const isSolver = session.role === "SOLVER";
+
+    // Citizens are strictly denied access to solver matching intelligence
+    if (session.role === "CITIZEN") {
+      return NextResponse.json(
+        { error: "Forbidden: Citizen accounts do not have access to solver matching intelligence.", code: "INSUFFICIENT_PRIVILEGES" },
+        { status: 403 }
+      );
+    }
+
     // Mode 1: Match solvers for a specific challenge
     if (challengeId) {
+      // Only Government Admin or Industry CSR can evaluate solvers for a challenge
+      if (!isAdmin && !isIndustry) {
+        return NextResponse.json(
+          { error: "Forbidden: Only Government Authorities and Industry CSR Partners can evaluate solver rosters for challenges.", code: "INSUFFICIENT_PRIVILEGES" },
+          { status: 403 }
+        );
+      }
+
       const challenge = await db.challenge.findUnique({
         where: { id: challengeId },
       });
@@ -85,6 +106,17 @@ export async function GET(request: Request) {
 
     // Mode 2: Match challenges for a specific solver
     if (solverId) {
+      // IDOR Protection: Solvers can only evaluate matches for themselves. ADMIN can query for any solver.
+      if (!isAdmin && (!isSolver || session.userId !== solverId)) {
+        return NextResponse.json(
+          {
+            error: "Forbidden: You are not authorized to access solver matching records for another user.",
+            code: "IDOR_FORBIDDEN",
+          },
+          { status: 403 }
+        );
+      }
+
       const solver = await db.user.findUnique({
         where: { id: solverId },
         include: {
