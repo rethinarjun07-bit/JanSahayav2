@@ -24,7 +24,8 @@
 
 import { isValidChallengeTransition, PERMITTED_LIFECYCLE_TRANSITIONS } from "../lib/lifecycle";
 import { RegisterSchema, CSRPledgeSchema } from "../lib/validators";
-import { SELF_REGISTERABLE_ROLES, DEMO_ALLOWED_ROLES } from "../lib/rbac";
+import { SELF_REGISTERABLE_ROLES, DEMO_ALLOWED_ROLES, isDemoModeEnabled } from "../lib/rbac";
+import { getStorageProvider } from "../lib/storage";
 
 describe("JanSahaya Enterprise Security Hardening Test Suite", () => {
   // ── 1. Role Boundaries & Admin Isolation ────────────────────────────────────
@@ -220,6 +221,50 @@ describe("JanSahaya Enterprise Security Hardening Test Suite", () => {
       const { password, ...safeProfile } = fullUserRecord;
       expect(safeProfile).not.toHaveProperty("password");
       expect(safeProfile.name).toBe("Officer Verma");
+    });
+  });
+
+  // ── 8. Production Hardening & Fail-Closed Demo Invariants ────────────────────
+  describe("Production Hardening & Fail-Closed Demo Invariants", () => {
+    const originalEnv = process.env;
+
+    beforeEach(() => {
+      process.env = { ...originalEnv };
+    });
+
+    afterAll(() => {
+      process.env = originalEnv;
+    });
+
+    test("isDemoModeEnabled returns false unconditionally in production", () => {
+      Object.defineProperty(process.env, "NODE_ENV", { value: "production", writable: true, configurable: true });
+      process.env.DEMO_MODE = "true";
+      expect(isDemoModeEnabled()).toBe(false);
+    });
+
+    test("isDemoModeEnabled returns true only when DEMO_MODE=true and not in production", () => {
+      Object.defineProperty(process.env, "NODE_ENV", { value: "development", writable: true, configurable: true });
+      process.env.DEMO_MODE = "true";
+      expect(isDemoModeEnabled()).toBe(true);
+
+      process.env.DEMO_MODE = "false";
+      expect(isDemoModeEnabled()).toBe(false);
+    });
+
+    test("Storage abstraction detects S3 provider when S3_BUCKET is configured", () => {
+      process.env.S3_BUCKET = "test-bucket";
+      process.env.S3_ACCESS_KEY_ID = "test-key";
+      process.env.S3_SECRET_ACCESS_KEY = "test-secret";
+      const provider = getStorageProvider();
+      expect(provider.constructor.name).toBe("S3CompatibleStorageProvider");
+    });
+
+    test("Storage abstraction detects Vercel Blob when BLOB_READ_WRITE_TOKEN is configured", () => {
+      delete process.env.S3_BUCKET;
+      delete process.env.STORAGE_PROVIDER;
+      process.env.BLOB_READ_WRITE_TOKEN = "vercel_blob_rw_test";
+      const provider = getStorageProvider();
+      expect(provider.constructor.name).toBe("VercelBlobStorageProvider");
     });
   });
 });

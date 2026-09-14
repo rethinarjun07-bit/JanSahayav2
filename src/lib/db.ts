@@ -10,6 +10,7 @@ export const db =
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
   });
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = db;
+// Cache PrismaClient singleton on globalThis to prevent connection pool exhaustion in both dev and serverless warm starts
+globalForPrisma.prisma = db;
 
 export default db;

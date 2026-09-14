@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
-import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import { getUserFromRequest } from "@/lib/auth";
 import { getClientIp, checkRateLimit, createRateLimitResponse, RATE_LIMIT_BUCKETS } from "@/lib/rate-limiter";
 import { safeLog } from "@/lib/safe-logger";
+import { isDemoModeEnabled } from "@/lib/rbac";
+import { saveUploadedFile } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
@@ -82,8 +83,7 @@ export async function POST(request: Request) {
     }
 
     // In production, enforce authentication. In demo mode, allow intake for field testing.
-    const isDemo = process.env.DEMO_MODE === "true" || process.env.NEXT_PUBLIC_DEMO_MODE === "true";
-    if (!session && !isDemo) {
+    if (!session && !isDemoModeEnabled()) {
       return NextResponse.json(
         { error: "Authentication required to upload media", code: "AUTH_REQUIRED" },
         { status: 401 }
@@ -134,29 +134,17 @@ export async function POST(request: Request) {
     }
 
     // 5. Secure Storage Path & Filename Generation (prevents directory traversal and overwrite)
-    const uploadDir = path.resolve(process.cwd(), "public", "uploads");
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-
     const randomSuffix = crypto.randomBytes(8).toString("hex");
     const sanitizedBase = path.basename(file.name, rawExt).replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 30);
     const safeFilename = `${Date.now()}-${sanitizedBase}-${randomSuffix}${rawExt}`;
-    const filePath = path.resolve(uploadDir, safeFilename);
 
-    // Explicit path containment check (guarantees zero path traversal)
-    if (!filePath.startsWith(uploadDir)) {
-      return NextResponse.json({ error: "Invalid upload destination path." }, { status: 400 });
-    }
-
-    fs.writeFileSync(filePath, buffer);
-
-    const publicUrl = `/uploads/${safeFilename}`;
+    const uploadResult = await saveUploadedFile(buffer, safeFilename, file.type);
 
     return NextResponse.json({
       success: true,
-      url: publicUrl,
-      filename: safeFilename,
+      url: uploadResult.url,
+      filename: uploadResult.filename,
+      provider: uploadResult.provider,
       sizeBytes: file.size,
       mimeType: file.type,
     });

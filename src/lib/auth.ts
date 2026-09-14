@@ -76,7 +76,7 @@ export async function verifyPassword(plainText: string, hashed: string): Promise
 }
 
 export function generateToken(payload: TokenPayload): string {
-  return jwt.sign(payload, JWT_SECRET, {
+  return jwt.sign(payload, getJwtSecret(), {
     algorithm: "HS256",
     expiresIn: JWT_EXPIRES_IN,
   });
@@ -84,7 +84,7 @@ export function generateToken(payload: TokenPayload): string {
 
 export function decodeToken(token: string): TokenPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET, {
+    return jwt.verify(token, getJwtSecret(), {
       algorithms: ["HS256"],
     }) as TokenPayload;
   } catch {

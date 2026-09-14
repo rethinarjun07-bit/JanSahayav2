@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { generateToken, AUTH_COOKIE_OPTIONS } from "@/lib/auth";
-import { DEMO_ALLOWED_ROLES } from "@/lib/rbac";
+import { DEMO_ALLOWED_ROLES, isDemoModeEnabled } from "@/lib/rbac";
 import { getClientIp, checkRateLimit, createRateLimitResponse, RATE_LIMIT_BUCKETS } from "@/lib/rate-limiter";
 import { safeLog } from "@/lib/safe-logger";
 
@@ -13,8 +13,8 @@ const ROLE_EMAILS: Record<string, string> = {
 };
 
 export async function POST(request: Request) {
-  // ── 1. Security Gate: Demo mode must be explicitly enabled ──────────────────
-  if (process.env.DEMO_MODE !== "true") {
+  // ── 1. Security Gate: Demo mode must be explicitly enabled (fails closed in production) ──
+  if (!isDemoModeEnabled()) {
     return NextResponse.json(
       { error: "Quick login is disabled. Please use /login with your credentials.", code: "DEMO_MODE_DISABLED" },
       { status: 403 }

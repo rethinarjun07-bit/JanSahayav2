@@ -4,6 +4,7 @@ import { getUserFromRequest } from "@/lib/auth";
 import { CommentCreateSchema } from "@/lib/validators";
 import { getClientIp, checkRateLimit, createRateLimitResponse, RATE_LIMIT_BUCKETS } from "@/lib/rate-limiter";
 import { safeLog } from "@/lib/safe-logger";
+import { isDemoModeEnabled } from "@/lib/rbac";
 
 export async function GET(
   request: Request,
@@ -44,8 +45,7 @@ export async function POST(
     // ── 2. Authenticate or Demo Fallback ───────────────────────────────────
     let userId = session?.userId;
     if (!userId) {
-      const isDemo = process.env.DEMO_MODE === "true" || process.env.NEXT_PUBLIC_DEMO_MODE === "true";
-      if (!isDemo) {
+      if (!isDemoModeEnabled()) {
         return NextResponse.json(
           { error: "Authentication required to post comments.", code: "AUTH_REQUIRED" },
           { status: 401 }

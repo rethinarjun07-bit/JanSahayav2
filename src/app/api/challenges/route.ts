@@ -6,6 +6,7 @@ import { classifyChallenge } from "@/lib/nlp/classifier";
 import { evaluateDuplicates } from "@/lib/nlp/tfidf";
 import { getClientIp, checkRateLimit, createRateLimitResponse, RATE_LIMIT_BUCKETS } from "@/lib/rate-limiter";
 import { safeLog } from "@/lib/safe-logger";
+import { isDemoModeEnabled } from "@/lib/rbac";
 
 export const dynamic = "force-dynamic";
 
@@ -131,9 +132,8 @@ export async function POST(request: Request) {
     let creatorId = session?.userId;
 
     if (!creatorId) {
-      // In production, reject unauthenticated challenge submissions
-      const isDemo = process.env.DEMO_MODE === "true" || process.env.NEXT_PUBLIC_DEMO_MODE === "true";
-      if (!isDemo) {
+      // In production, reject unauthenticated challenge submissions (fails closed)
+      if (!isDemoModeEnabled()) {
         return NextResponse.json(
           { error: "Authentication required to submit challenges.", code: "AUTH_REQUIRED" },
           { status: 401 }

@@ -126,3 +126,16 @@ export const SELF_REGISTERABLE_ROLES: AppRole[] = ["CITIZEN", "SOLVER", "INDUSTR
  * ADMIN always requires real credentials via /login.
  */
 export const DEMO_ALLOWED_ROLES: AppRole[] = ["CITIZEN", "SOLVER", "INDUSTRY"];
+
+/**
+ * Centrally determines whether Demo Mode and unauthenticated fallbacks are permitted.
+ * CRITICAL SECURITY INVARIANT:
+ * Always returns false in production (NODE_ENV === "production").
+ * Demo mode must fail-closed in production deployments.
+ */
+export function isDemoModeEnabled(): boolean {
+  if (process.env.NODE_ENV === "production") {
+    return false;
+  }
+  return process.env.DEMO_MODE === "true";
+}

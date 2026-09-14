@@ -5,6 +5,7 @@ import { CitizenFeedbackSchema } from "@/lib/validators";
 import { getClientIp, checkRateLimit, createRateLimitResponse, RATE_LIMIT_BUCKETS } from "@/lib/rate-limiter";
 import { safeLog } from "@/lib/safe-logger";
 import { isValidChallengeTransition } from "@/lib/lifecycle";
+import { isDemoModeEnabled } from "@/lib/rbac";
 
 export async function POST(
   request: Request,
@@ -22,8 +23,7 @@ export async function POST(
 
     let userId = session?.userId;
     if (!userId) {
-      const isDemo = process.env.DEMO_MODE === "true" || process.env.NEXT_PUBLIC_DEMO_MODE === "true";
-      if (!isDemo) {
+      if (!isDemoModeEnabled()) {
         return NextResponse.json(
           { error: "Authentication required to submit resolution feedback.", code: "AUTH_REQUIRED" },
           { status: 401 }
@@ -94,6 +94,8 @@ export async function POST(
       if (challenge.status === "FIELD_VERIFIED" || challenge.status === "SOLVED") {
         newStatus = "IN_PROGRESS";
       }
+    }
+
     if (newStatus !== challenge.status && !isValidChallengeTransition(challenge.status, newStatus)) {
       return NextResponse.json(
         {
