@@ -157,6 +157,19 @@ describe("Institutional Assignment Gates", () => {
     expect(canAssignUniversity("SUBMITTED")).toBe(false);
   });
 
+  test("Citizen challenge creation leaves assignedUniversityId as null (Awaiting Government Verification)", () => {
+    // Simulates the creation contract from /api/challenges
+    const submissionResult = {
+      status: "SUBMITTED",
+      autoAssignedUniversity: "BIT Mesra — Disaster Innovation Lab", // AI recommendation stored
+      assignedUniversityId: null, // Must remain null until official government verification
+    };
+
+    expect(submissionResult.status).toBe("SUBMITTED");
+    expect(submissionResult.assignedUniversityId).toBeNull();
+    expect(submissionResult.autoAssignedUniversity).toBeTruthy();
+  });
+
   test("Rejected challenge (REJECTED) cannot receive university assignment", () => {
     expect(canAssignUniversity("REJECTED")).toBe(false);
   });

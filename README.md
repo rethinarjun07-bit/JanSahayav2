@@ -36,9 +36,10 @@ JanSahaya uses an integrated full-stack architecture with clear separation of re
 | Layer | Technology & Role |
 |-------|-------------------|
 | **Primary Full-Stack & API** | **Next.js 14 (App Router) + TypeScript** (`src/`) — Full-stack web application, server-side route handlers, robust JWT + bcrypt security, RBAC middleware, and real-time civic workflows |
-| **Relational Database** | **Prisma ORM** (`prisma/schema.prisma`) — Dual-target architecture: local zero-setup **SQLite** (`dev.db`) for instant offline demonstration & evaluation, with direct toggle to production **PostgreSQL 16** via `DATABASE_URL` |
+| **Relational Database** | **PostgreSQL 16 + Prisma ORM** (`prisma/schema.prisma`) — Production-grade relational storage with connection pooling (`DATABASE_URL`) and direct migration support (`DIRECT_URL`) |
+| **Persistent Object Storage**| **Storage Abstraction Layer** (`src/lib/storage.ts`) — Decoupled storage supporting AWS S3, Cloudflare R2, and Vercel Blob with magic-byte validation and traversal defense |
 | **Hybrid Civic Intelligence** | **Deterministic NLP + TF-IDF + Gemini Cascade** (`src/lib/nlp/`) — 3-tier intelligence engine: Local keyword rules & urgency scoring (Tier 1), TF-IDF N-gram duplicate detection & geospatial clustering (Tier 2), and multimodal Gemini LLM with offline fallback (Tier 3) |
-| **Auxiliary AI Microservice** | **Python (FastAPI)** (`backend/`) — Optional companion microservice for advanced Scikit-Learn pipelines, batch ML clustering, and server-side speech models |
+| **Auxiliary AI Microservice** | **Python (FastAPI)** (`backend/`) — Optional companion microservice for advanced Scikit-Learn pipelines, batch ML clustering, and server-side speech models (deployable separately if desired) |
 | **GIS & Visualization** | **Leaflet + Recharts + Framer Motion** — Interactive geographic disaster heatmap, pulsing severity indicators, and analytical charts |
 | **Containerization** | **Docker Compose** (`docker-compose.yml`) — Containerized deployment for PostgreSQL + Next.js + Python |
 
@@ -230,7 +231,7 @@ Run `npx tsx prisma/seed.ts` to populate:
 ```
 jansahaya/
 ├── prisma/
-│   ├── schema.prisma          SQLite schema (11 models)
+│   ├── schema.prisma          PostgreSQL schema (Prisma ORM)
 │   └── seed.ts               Comprehensive demo data seeder
 │
 ├── src/
@@ -274,13 +275,17 @@ jansahaya/
 
 ---
 
-## 🔒 Security Notes
+## 🔒 Security Architecture
 
-- Passwords hashed with **bcryptjs** (12 salt rounds)
-- Auth via **HTTP-only JWT cookies** (30-day expiry)
-- All mutations validate input with **Zod** schemas
-- Admin-only API routes check `role === "ADMIN"`
-- File uploads restricted to images (`image/*`) with 10 MB limit
+- Passwords hashed with **bcryptjs** (10 salt rounds)
+- Session auth via **HTTP-only, Secure, SameSite=Strict JWT cookies** (7-day duration)
+- Cryptographically strong `JWT_SECRET` (enforced 32+ characters in production)
+- Strict RBAC: CITIZEN, SOLVER, INDUSTRY, ADMIN (ADMIN cannot be self-registered)
+- Statutory gate: **Government Authority alone** verifies challenges and selects solutions
+- Quad-Helix lifecycle state machine (`src/lib/lifecycle.ts`) rejects invalid state transitions
+- File uploads validated by **magic-byte signature**, MIME type, path traversal defense, and 10 MB limit
+- Persistent storage abstraction layer supporting AWS S3, Cloudflare R2, and Vercel Blob
+- Comprehensive HTTP security headers (HSTS, CSP, X-Frame-Options, X-Content-Type-Options)
 
 ---
 
@@ -303,14 +308,18 @@ jansahaya/
 
 ---
 
-## 📦 Environment Variables
+## 📦 Environment Variables & Deployment
+
+See [`DEPLOYMENT.md`](./DEPLOYMENT.md) for the complete production setup and Vercel step-by-step guide.
 
 ```env
-# .env (local development example)
-DATABASE_URL="file:./dev.db"
+# .env.example (Production / Staging Template)
+DATABASE_URL="postgresql://<user>:<password>@<host>:5432/<database>?pgbouncer=true"
+DIRECT_URL="postgresql://<user>:<password>@<host>:5432/<database>"
 JWT_SECRET="<generate-a-secure-random-32-character-secret-in-production>"
-NEXT_PUBLIC_APP_NAME="JanSahaya"
-NEXT_PUBLIC_APP_TAGLINE="India's Societal Innovation Portal"
+DEMO_MODE="false"
+NEXT_PUBLIC_DEMO_MODE="false"
+STORAGE_PROVIDER="s3" # or "blob"
 ```
 
 ---

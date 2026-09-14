@@ -249,7 +249,7 @@ export async function POST(request: Request) {
         aiTags: JSON.stringify(data.aiTags && data.aiTags.length > 0 ? data.aiTags : classification.tags),
         predictedSector: classification.predictedCategory,
         autoAssignedUniversity: classification.recommendedUniversity.name,
-        assignedUniversityId: matchedUni ? matchedUni.id : null,
+        assignedUniversityId: null, // Advisory only: Official institutional assignment requires Government verification
         createdById: creatorId,
 
         // Provenance Architecture (Citizen -> AI -> Official Government Determination)
