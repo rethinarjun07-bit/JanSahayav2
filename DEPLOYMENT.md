@@ -18,24 +18,45 @@ Before deploying to Vercel, ensure you have:
 
 ---
 
-## 2. Vercel Deployment Steps
+## 2. Step-by-Step Vercel Deployment Procedure
 
-### Step 1: Import Project into Vercel
-1. Navigate to the **Vercel Dashboard** → Click **Add New...** → **Project**.
-2. Select your repository: `JanSahayav2`.
-3. Framework Preset: **Next.js** (automatically detected).
-4. Root Directory: `./` (default).
+Follow these exact steps to deploy to Vercel:
 
-### Step 2: Configure Build & Output Settings
-- **Build Command**: `npm run build` (which runs `prisma generate && next build`)
-- **Output Directory**: `.next` (automatically detected)
-- **Install Command**: `npm install` (automatically detected)
+1. **Push project to GitHub**: Ensure the latest commit on `main` is pushed to your GitHub repository.
+2. **Open Vercel**: Navigate to the [Vercel Dashboard](https://vercel.com/dashboard).
+3. **Import the GitHub repository**: Click **Add New...** → **Project**, and select your `JanSahayav2` repository.
+4. **Root Directory**: Select `./` (the root of the repository).
+5. **Framework Preset**: Select **Next.js** (automatically detected).
+6. **Build & Output Settings**:
+   - **Build Command**: `npm run build` (runs `prisma generate && next build`)
+   - **Install Command**: `npm install`
+   - **Output Directory**: Leave as default (`.next`)
+7. **Configure Production Environment Variables**: Expand the **Environment Variables** section and add all required keys (see Section 3).
+8. **Set `DEMO_MODE=false`**: Guarantees all demo bypass routes and personas fail-closed in production.
+9. **Set `NEXT_PUBLIC_DEMO_MODE=false`**: Hides all demo role switchers and quick-login buttons from the browser UI.
+10. **Configure PostgreSQL**:
+    - Add `DATABASE_URL` (pooled connection for serverless queries).
+    - Add `DIRECT_URL` (direct connection for Prisma migrations).
+    - Apply schema to your production database using safe deploy command:
+      ```bash
+      npx prisma migrate deploy
+      # or for initial schema sync without data loss:
+      npx prisma db push
+      ```
+    - **Never** run `prisma migrate reset` in production!
+11. **Configure Persistent Object Storage**: Choose either S3/R2 (`STORAGE_PROVIDER=s3`, `S3_*`) or Vercel Blob (`STORAGE_PROVIDER=blob`, `BLOB_READ_WRITE_TOKEN`).
+12. **Deploy**: Click **Deploy**. Vercel will install dependencies, generate Prisma Client, compile all pages, and deploy serverless functions.
+13. **Copy the Generated URL**: Once deployed, copy your production domain (e.g., `https://jansahaya-prod.vercel.app`).
+14. **Configure CORS**: In Vercel Project Settings → Environment Variables, set `CORS_ORIGINS=https://jansahaya-prod.vercel.app`.
+15. **Test the Production Application**: Run through the post-deployment smoke tests in Section 6.
 
-### Step 3: Configure Environment Variables
-In the **Environment Variables** section in Vercel, add the variables described in Section 3 & 4 below.
+> [!NOTE]
+> **Why `vercel.json` & `.vercelignore` are included:**
+> The repository includes `vercel.json` declaring `framework: "nextjs"` and `.vercelignore` ignoring `backend/`. This informs Vercel that the repository is a standard single Next.js project and prevents the `"vercel.json required to deploy projects with multiple services"` warning.
 
-### Step 4: Deploy
-Click **Deploy**. Vercel will install dependencies, generate the Prisma Client, run Next.js optimizations, and deploy the serverless lambdas.
+> [!IMPORTANT]
+> **FastAPI Auxiliary Backend (`backend/`):**
+> The root Next.js application is 100% self-contained for all citizen, solver, authority, industry, AI, and GIS workflows. The Python FastAPI service in `backend/` is completely optional. If you need it, deploy it separately (e.g. Render, Railway, or AWS) and set `FASTAPI_BACKEND_URL` to its public URL. Do NOT deploy Python inside the Vercel Next.js deployment.
 
 ---
 

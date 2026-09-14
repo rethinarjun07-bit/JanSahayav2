@@ -12,6 +12,7 @@ export interface StorageUploadResult {
 
 export interface StorageProvider {
   save(buffer: Buffer, safeFilename: string, mimeType: string): Promise<StorageUploadResult>;
+  delete(safeFilename: string): Promise<boolean>;
 }
 
 // ---------------------------------------------------------------------------
@@ -20,6 +21,15 @@ export interface StorageProvider {
 class LocalDiskStorageProvider implements StorageProvider {
   async save(buffer: Buffer, safeFilename: string, _mimeType: string): Promise<StorageUploadResult> {
     const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+    const isProduction = process.env.NODE_ENV === "production";
+
+    // In production on serverless (Vercel), ephemeral disk is not suitable for permanent user uploads.
+    // Fail safely unless explicitly overridden via ALLOW_EPHEMERAL_UPLOADS=true for quick staging previews.
+    if (isServerless && isProduction && !process.env.ALLOW_EPHEMERAL_UPLOADS) {
+      throw new Error(
+        "Persistent object storage is required in production on Vercel. Please configure S3/R2 (S3_BUCKET, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY) or Vercel Blob (BLOB_READ_WRITE_TOKEN), or set STORAGE_PROVIDER=s3 or STORAGE_PROVIDER=blob."
+      );
+    }
 
     // On Vercel / serverless runtimes, public/ is read-only.
     // Use /tmp as an ephemeral fallback if cloud credentials are not yet supplied.
@@ -52,6 +62,22 @@ class LocalDiskStorageProvider implements StorageProvider {
       provider: isServerless ? "ephemeral-tmp" : "local",
       sizeBytes: buffer.length,
     };
+  }
+
+  async delete(safeFilename: string): Promise<boolean> {
+    const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+    const baseDir = isServerless
+      ? path.resolve("/tmp", "jansahaya-uploads")
+      : path.resolve(process.cwd(), "public", "uploads");
+    const targetPath = path.resolve(baseDir, safeFilename);
+    if (!targetPath.startsWith(baseDir)) {
+      throw new Error("Security Error: Path traversal attempt detected.");
+    }
+    if (fs.existsSync(targetPath)) {
+      fs.unlinkSync(targetPath);
+      return true;
+    }
+    return false;
   }
 }
 
@@ -170,6 +196,44 @@ class S3CompatibleStorageProvider implements StorageProvider {
       sizeBytes: buffer.length,
     };
   }
+
+  async delete(safeFilename: string): Promise<boolean> {
+    if (!this.bucket || !this.accessKeyId || !this.secretAccessKey) return false;
+    try {
+      const date = new Date();
+      const dateStamp = date.toISOString().replace(/[:-]|\.\d{3}/g, "").slice(0, 8);
+      const amzDate = date.toISOString().replace(/[:-]|\.\d{3}/g, "");
+      const host = this.endpoint ? new URL(this.endpoint).host : `${this.bucket}.s3.${this.region}.amazonaws.com`;
+      const requestUrl = this.endpoint
+        ? `${this.endpoint}/${this.bucket}/${safeFilename}`
+        : `https://${this.bucket}.s3.${this.region}.amazonaws.com/${safeFilename}`;
+      const canonicalUri = this.endpoint ? `/${this.bucket}/${safeFilename}` : `/${safeFilename}`;
+      const payloadHash = this.hash("");
+      const canonicalHeaders = `host:${host}\nx-amz-content-sha256:${payloadHash}\nx-amz-date:${amzDate}\n`;
+      const signedHeaders = "host;x-amz-content-sha256;x-amz-date";
+      const canonicalRequest = ["DELETE", canonicalUri, "", canonicalHeaders, signedHeaders, payloadHash].join("\n");
+      const credentialScope = `${dateStamp}/${this.region}/s3/aws4_request`;
+      const stringToSign = ["AWS4-HMAC-SHA256", amzDate, credentialScope, this.hash(canonicalRequest)].join("\n");
+      const kDate = this.hmac(`AWS4${this.secretAccessKey}`, dateStamp);
+      const kRegion = this.hmac(kDate, this.region);
+      const kService = this.hmac(kRegion, "s3");
+      const kSigning = this.hmac(kService, "aws4_request");
+      const signature = crypto.createHmac("sha256", kSigning).update(stringToSign, "utf8").digest("hex");
+      const authorization = `AWS4-HMAC-SHA256 Credential=${this.accessKeyId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+
+      const response = await fetch(requestUrl, {
+        method: "DELETE",
+        headers: {
+          "x-amz-date": amzDate,
+          "x-amz-content-sha256": payloadHash,
+          Authorization: authorization,
+        },
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -214,6 +278,25 @@ class VercelBlobStorageProvider implements StorageProvider {
       sizeBytes: buffer.length,
     };
   }
+
+  async delete(safeFilenameOrUrl: string): Promise<boolean> {
+    if (!this.token) return false;
+    try {
+      const url = safeFilenameOrUrl.startsWith("http")
+        ? safeFilenameOrUrl
+        : `https://blob.vercel-storage.com/${safeFilenameOrUrl}`;
+      const response = await fetch(url, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${this.token}`,
+          "x-api-version": "7",
+        },
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -252,5 +335,18 @@ export async function saveUploadedFile(
   } catch (error) {
     safeLog.error("Storage Provider Upload Error:", error);
     throw error;
+  }
+}
+
+/**
+ * High-level helper to delete an uploaded file.
+ */
+export async function deleteUploadedFile(safeFilename: string): Promise<boolean> {
+  const provider = getStorageProvider();
+  try {
+    return await provider.delete(safeFilename);
+  } catch (error) {
+    safeLog.error("Storage Provider Delete Error:", error);
+    return false;
   }
 }

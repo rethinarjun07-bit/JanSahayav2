@@ -90,7 +90,9 @@ export async function middleware(request: NextRequest) {
         .map((o) => o.trim().replace(/^https?:\/\//, "").split("/")[0])
         .filter(Boolean);
 
-      const allowedHosts = new Set([host, "localhost:3000", "127.0.0.1:3000", "localhost:8000", ...customOrigins]);
+      const isDev = process.env.NODE_ENV !== "production";
+      const devHosts = isDev ? ["localhost:3000", "127.0.0.1:3000", "localhost:8000"] : [];
+      const allowedHosts = new Set([host, ...devHosts, ...customOrigins]);
 
       if (!allowedHosts.has(originHost)) {
         return NextResponse.json(

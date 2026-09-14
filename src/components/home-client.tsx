@@ -648,7 +648,7 @@ export function HomeClient({
             Civic Participation
           </span>
           <h2 className="text-3xl sm:text-4xl font-extrabold font-serif text-slate-900 mt-3 mb-2">
-            "By the People. For the People."
+            &ldquo;By the People. For the People.&rdquo;
           </h2>
           <p className="text-xs text-[#1A3D2F] font-semibold mb-3 tracking-wide">
             Starting from Jharkhand&apos;s villages, coalfields and cities.

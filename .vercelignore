@@ -1,0 +1,6 @@
+# Ignore Python auxiliary backend from Vercel Next.js build
+backend/
+*.bat
+docker-compose.yml
+.git
+.github
