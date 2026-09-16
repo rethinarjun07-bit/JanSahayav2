@@ -6,14 +6,19 @@ import db from "@/lib/db";
 export const dynamic = "force-dynamic";
 
 export default async function SolverProfilePage() {
-  const solver = await db.user.findFirst({
-    where: { email: "solver@demo.in" },
-    include: {
-      solutions: {
-        include: { challenge: true, milestones: true, reviews: true },
+  let solver: any = null;
+  try {
+    solver = await db.user.findFirst({
+      where: { email: "solver@demo.in" },
+      include: {
+        solutions: {
+          include: { challenge: true, milestones: true, reviews: true },
+        },
       },
-    },
-  });
+    });
+  } catch (err) {
+    console.warn("Database query failed in SolverProfilePage:", err);
+  }
 
   const solverSkills: string[] = solver?.skills ? JSON.parse(solver.skills) : [];
   const solverBadges: { id: string; name: string; icon: string }[] = solver?.badges

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import {
@@ -88,7 +88,7 @@ export default function ChallengesCatalogPage() {
   // Upvoting set to avoid double clicks
   const [upvotingIds, setUpvotingIds] = useState<Record<string, boolean>>({});
 
-  const fetchChallenges = async () => {
+  const fetchChallenges = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -108,7 +108,7 @@ export default function ChallengesCatalogPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [search, selectedDistrict, selectedCategory, selectedSeverity, selectedStatus]);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
@@ -116,7 +116,7 @@ export default function ChallengesCatalogPage() {
     }, 250);
 
     return () => clearTimeout(delayDebounceFn);
-  }, [search, selectedDistrict, selectedCategory, selectedSeverity, selectedStatus]);
+  }, [fetchChallenges]);
 
   // Handle Judge Simulation Trigger
   const handleSimulateAlert = async () => {
@@ -248,15 +248,15 @@ export default function ChallengesCatalogPage() {
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="text-xs font-bold uppercase tracking-wider text-gov-saffron bg-orange-50 px-2.5 py-0.5 rounded-full border border-orange-200">
-                Disaster & Societal Repository
+                {t("disasterRepository")}
               </span>
               <span className="text-xs font-semibold text-slate-400">&bull;</span>
               <span className="text-xs font-medium text-slate-500">
-                All 24 Jharkhand Districts Active
+                {t("allDistrictsActive")}
               </span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-serif">
-              National Ground Challenges Catalog
+              {t("catalogTitle")}
             </h1>
           </div>
 
@@ -277,7 +277,7 @@ export default function ChallengesCatalogPage() {
                 title="3-Column Cards Grid"
               >
                 <LayoutGrid className="w-3.5 h-3.5" />
-                <span>Grid</span>
+                <span>{t("gridMode")}</span>
               </button>
 
               <button
@@ -294,7 +294,7 @@ export default function ChallengesCatalogPage() {
                 title="Split Interactive Map & List"
               >
                 <Columns2 className="w-3.5 h-3.5" />
-                <span>Split Map</span>
+                <span>{t("splitMapMode")}</span>
               </button>
 
               <button
@@ -311,7 +311,7 @@ export default function ChallengesCatalogPage() {
                 title="Full GIS Map Mode"
               >
                 <MapIcon className="w-3.5 h-3.5" />
-                <span>GIS Map</span>
+                <span>{t("fullMapMode")}</span>
               </button>
             </div>
 
@@ -324,7 +324,7 @@ export default function ChallengesCatalogPage() {
               title="Simulate live disaster intake for evaluation"
             >
               <Radio className={`w-3.5 h-3.5 ${isSimulating ? "animate-spin" : "text-red-600"}`} />
-              <span>{isSimulating ? "Simulating..." : "Simulate Incident"}</span>
+              <span>{isSimulating ? t("simulating") : t("simulateIncident")}</span>
             </button>
 
             {/* Post New Challenge Button */}
@@ -334,7 +334,7 @@ export default function ChallengesCatalogPage() {
               className="px-4 py-2 bg-gradient-to-r from-gov-saffron to-amber-500 hover:from-amber-600 hover:to-orange-600 text-white text-xs font-bold rounded-xl shadow-md flex items-center gap-1.5 transition-all transform active:scale-95"
             >
               <PlusCircle className="w-4 h-4" />
-              <span>Post Challenge</span>
+              <span>{t("postChallengeBtn")}</span>
             </Link>
           </div>
         </PopItem>
@@ -349,7 +349,7 @@ export default function ChallengesCatalogPage() {
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search challenges by disaster keywords, culverts, fire, mine..."
+                placeholder={t("searchPlaceholder")}
                 className="w-full pl-10 pr-4 py-2.5 text-xs sm:text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-gov-navy focus:outline-none"
               />
             </div>
@@ -364,7 +364,7 @@ export default function ChallengesCatalogPage() {
                 }}
                 className="w-full py-2.5 px-3 text-xs sm:text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-gov-navy focus:outline-none bg-white text-slate-700"
               >
-                <option value="All Districts">All Districts (India & Focus Jharkhand)</option>
+                <option value="All Districts">{t("allDistricts")}</option>
                 <optgroup label="Jharkhand Districts (24)">
                   {JHARKHAND_DISTRICTS.map((d) => (
                     <option key={d.name} value={d.name}>
@@ -385,7 +385,7 @@ export default function ChallengesCatalogPage() {
                 }}
                 className="w-full py-2.5 px-3 text-xs sm:text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-gov-navy focus:outline-none bg-white text-slate-700"
               >
-                <option value="All Categories">All Sectors & Domains</option>
+                <option value="All Categories">{t("allCategories")}</option>
                 {CATEGORIES.map((c) => (
                   <option key={c} value={c}>
                     {c}
@@ -406,9 +406,9 @@ export default function ChallengesCatalogPage() {
                   }}
                   className="w-full bg-transparent text-xs sm:text-sm text-slate-700 focus:outline-none font-medium cursor-pointer"
                 >
-                  <option value="urgency">Sort: Highest Urgency</option>
-                  <option value="support">Sort: Most Supported</option>
-                  <option value="newest">Sort: Newest First</option>
+                  <option value="urgency">{t("sortBy")}: {t("sortByUrgency")}</option>
+                  <option value="support">{t("sortBy")}: {t("sortBySupport")}</option>
+                  <option value="newest">{t("sortBy")}: {t("sortByNewest")}</option>
                 </select>
               </div>
             </div>
@@ -673,7 +673,7 @@ function renderCard(
           href={`/challenges/${item.id}`}
           className="text-xs font-bold text-gov-navy hover:text-gov-navyLight flex items-center gap-1"
         >
-          <span>Explore</span>
+          <span>{item.category ? "View Details" : "View"}</span>
           <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
         </Link>
       </div>

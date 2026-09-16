@@ -18,26 +18,33 @@ import { SolverDashboardClient } from "./solver-dashboard-client";
 export const dynamic = "force-dynamic";
 
 export default async function SolverDashboardPage() {
-  // Get active solver (default to Dr. Aarav Mehta)
-  const solver = await db.user.findFirst({
-    where: { role: "SOLVER", email: "solver@demo.in" },
-    include: {
-      solutions: {
-        include: {
-          challenge: true,
-          milestones: { orderBy: { order: "asc" } },
-          reviews: true,
+  let solver: any = null;
+  let challenges: any[] = [];
+
+  try {
+    // Get active solver (default to Dr. Aarav Mehta)
+    solver = await db.user.findFirst({
+      where: { role: "SOLVER", email: "solver@demo.in" },
+      include: {
+        solutions: {
+          include: {
+            challenge: true,
+            milestones: { orderBy: { order: "asc" } },
+            reviews: true,
+          },
         },
       },
-    },
-  });
+    });
 
-  // Get active challenges to run match
-  const challenges = await db.challenge.findMany({
-    where: { status: { not: "MERGED" } },
-    orderBy: { urgencyScore: "desc" },
-    take: 12,
-  });
+    // Get active challenges to run match
+    challenges = await db.challenge.findMany({
+      where: { status: { not: "MERGED" } },
+      orderBy: { urgencyScore: "desc" },
+      take: 12,
+    });
+  } catch (err) {
+    console.warn("Database query failed in SolverDashboardPage:", err);
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 py-10 px-4 sm:px-6 lg:px-8">

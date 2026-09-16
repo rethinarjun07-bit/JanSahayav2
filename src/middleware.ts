@@ -4,6 +4,27 @@ const JWT_SECRET =
   process.env.JWT_SECRET?.trim() ||
   (process.env.NODE_ENV === "production" ? "" : "jansahaya-dev-local-only-jwt-secret-key-32chars");
 
+function base64UrlToBytes(str: string): Uint8Array {
+  let b64 = str.replace(/-/g, "+").replace(/_/g, "/");
+  while (b64.length % 4 !== 0) {
+    b64 += "=";
+  }
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+function base64UrlDecodeString(str: string): string {
+  let b64 = str.replace(/-/g, "+").replace(/_/g, "/");
+  while (b64.length % 4 !== 0) {
+    b64 += "=";
+  }
+  return atob(b64);
+}
+
 // ---------------------------------------------------------------------------
 // Edge-compatible HMAC-SHA256 JWT verification
 // ---------------------------------------------------------------------------
@@ -27,16 +48,13 @@ async function verifyJWT(token: string): Promise<Record<string, unknown> | null>
 
     // Reconstruct the signed data
     const signedData = new TextEncoder().encode(`${header}.${payload}`);
-    const sigBytes = Uint8Array.from(
-      atob(signature.replace(/-/g, "+").replace(/_/g, "/")),
-      (c) => c.charCodeAt(0)
-    );
+    const sigBytes = base64UrlToBytes(signature);
 
-    const valid = await crypto.subtle.verify("HMAC", cryptoKey, sigBytes, signedData);
+    const valid = await crypto.subtle.verify("HMAC", cryptoKey, sigBytes as BufferSource, signedData);
     if (!valid) return null;
 
     // Decode and validate expiry
-    const decoded = JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")));
+    const decoded = JSON.parse(base64UrlDecodeString(payload));
     if (decoded.exp && decoded.exp < Math.floor(Date.now() / 1000)) return null;
 
     return decoded;

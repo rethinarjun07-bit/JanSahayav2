@@ -73,14 +73,14 @@ export function HomeClient({
 
   // Problem lifecycle steps
   const lifecycleSteps = [
-    { num: "01", name: "PROBLEM", desc: "Citizen Voice Intake", role: "Citizen" },
-    { num: "02", name: "UNDERSTAND", desc: "NLP & Duplicate Scan", role: "JanSahaya AI" },
-    { num: "03", name: "VERIFY", desc: "Statutory Sanction", role: "Government" },
-    { num: "04", name: "MATCH", desc: "Domain Lab Alignment", role: "AI & Govt" },
-    { num: "05", name: "SOLVE", desc: "Applied R&D Proposals", role: "University" },
-    { num: "06", name: "FUND", desc: "Section 135 Grants", role: "Industry / CSR" },
-    { num: "07", name: "IMPLEMENT", desc: "Stage-Gated Field Pilot", role: "Multi-Party" },
-    { num: "08", name: "IMPACT", desc: "Measurable Outcome", role: "Community" },
+    { num: "01", name: t("stepProblem"), desc: t("stepProblemDesc"), role: t("helixCitizenTitle") },
+    { num: "02", name: t("stepUnderstand"), desc: t("stepUnderstandDesc"), role: "JanSahaya AI" },
+    { num: "03", name: t("stepVerify"), desc: t("stepVerifyDesc"), role: t("helixGovtTitle") },
+    { num: "04", name: t("stepMatch"), desc: t("stepMatchDesc"), role: "AI & Govt" },
+    { num: "05", name: t("stepSolve"), desc: t("stepSolveDesc"), role: t("helixAcademiaTitle") },
+    { num: "06", name: t("stepFund"), desc: t("stepFundDesc"), role: t("helixIndustryTitle") },
+    { num: "07", name: t("stepImplement"), desc: t("stepImplementDesc"), role: "Multi-Party" },
+    { num: "08", name: t("stepImpact"), desc: t("stepImpactDesc"), role: "Community" },
   ];
 
   return (
@@ -206,13 +206,13 @@ export function HomeClient({
                 <AnimatedCounter value={totalSolutions} />
               </div>
               <div className="text-[11px] text-emerald-300 font-medium mt-1 flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3" /> Field Pilots Deployed
+                <CheckCircle2 className="w-3 h-3" /> {t("fieldPilotsDeployed")}
               </div>
             </PopItem>
 
             <PopItem delay={0.36} hoverEffect className="bg-white/10 backdrop-blur-md border border-white/15 hover:border-white/30 p-4 sm:p-5 rounded-2xl text-left transition-all">
               <div className="text-[11px] font-bold text-emerald-200 uppercase tracking-wider mb-1">
-                Partner Researchers
+                {t("partnerResearchers")}
               </div>
               <div className="text-3xl font-extrabold text-white">
                 <AnimatedCounter value={totalSolvers} />
@@ -228,7 +228,7 @@ export function HomeClient({
               </div>
               <div className="text-3xl font-extrabold text-amber-300">₹4.85 Cr</div>
               <div className="text-[11px] text-slate-300 font-medium mt-1 flex items-center gap-1">
-                <Building2 className="w-3 h-3" /> Tata Steel &bull; Coal India
+                <Building2 className="w-3 h-3" /> {t("csrPledgedSubtitle")}
               </div>
             </PopItem>
           </div>
@@ -242,10 +242,10 @@ export function HomeClient({
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
-                <h2 className="text-base font-bold text-slate-900 font-serif">Jharkhand Civic Pulse</h2>
+                <h2 className="text-base font-bold text-slate-900 font-serif">{t("jharkhandCivicPulse")}</h2>
               </div>
               <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700">
-                Platform Demo Data
+                {t("platformDemoData")}
               </span>
             </div>
             <Link
@@ -253,7 +253,7 @@ export function HomeClient({
               className="inline-flex items-center gap-1 text-xs font-bold text-[#1A3D2F] hover:text-[#2D6A4F] transition-colors group"
             >
               <MapPin className="w-3.5 h-3.5" />
-              <span>Explore on GIS Map</span>
+              <span>{t("exploreOnGisMap")}</span>
               <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
             </Link>
           </div>
@@ -309,7 +309,7 @@ export function HomeClient({
                     />
                   </div>
                   <div className="text-[10px] text-slate-500 flex items-center justify-between">
-                    <span><AnimatedCounter value={count} /> problems</span>
+                    <span><AnimatedCounter value={count} /> {t("problemsCount")}</span>
                     <span className="font-semibold" style={{ color }}>{barPct}%</span>
                   </div>
                 </motion.div>
@@ -329,13 +329,13 @@ export function HomeClient({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto mb-12">
             <span className="text-xs font-bold text-[#1A3D2F] uppercase tracking-wider bg-white px-3 py-1 rounded-full border border-[#E8DFC8]">
-              Continuous Governance Lifecycle
+              {t("governanceLifecycleTag")}
             </span>
             <h2 className="text-2xl sm:text-3xl font-bold font-serif text-slate-900 mt-3">
-              From Ground Problem to Measurable Impact
+              {t("governanceLifecycleTitle")}
             </h2>
             <p className="text-xs sm:text-sm text-slate-600 mt-2">
-              A transparent, eight-stage progression where technology assists and democratic institutions verify.
+              {t("governanceLifecycleSub")}
             </p>
           </div>
 

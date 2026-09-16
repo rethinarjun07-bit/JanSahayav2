@@ -83,11 +83,12 @@ export function Navbar() {
     { href: "/",               label: t("navHome"),       icon: ShieldAlert, roles: null },
     { href: "/challenges",     label: t("navChallenges"), icon: Flame,       roles: null },
     { href: "/map",            label: t("navMap"),        icon: MapPin,      roles: null },
-    { href: "/ai-report",      label: "AI Report",        icon: Mic,         roles: null, badge: "NEW" },
+    { href: "/ai-report",      label: t("navAiReport"),   icon: Mic,         roles: null, badge: "NEW" },
+    { href: "/demo",           label: t("navDemo") || "Demo Hub", icon: Sparkles, roles: null, badge: "SIH" },
     { href: "/analytics",      label: t("navAnalytics"),  icon: BarChart3,   roles: null },
     { href: "/solver/dashboard", label: t("navSolver"),   icon: Zap,         roles: ["SOLVER", "ADMIN"] },
     { href: "/industry",       label: t("navIndustry"),   icon: Building2,   roles: ["INDUSTRY", "ADMIN"] },
-    { href: "/admin/merge",    label: "Merge",            icon: GitMerge,    roles: ["ADMIN"], badge: "NLP" },
+    { href: "/admin/merge",    label: t("navMerge"),      icon: GitMerge,    roles: ["ADMIN"], badge: "NLP" },
     { href: "/admin",          label: t("navAdmin"),      icon: UserCheck,   roles: ["ADMIN"], badge: "Govt" },
   ];
 
@@ -103,14 +104,14 @@ export function Navbar() {
         <div className="max-w-7xl mx-auto flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1 text-amber-300 font-bold tracking-wide">
-              🇮🇳 Govt. of Jharkhand &bull; Disaster Management Cell
+              🇮🇳 {t("jharkhandGovtBanner")}
             </span>
             <span className="hidden md:inline text-emerald-700">|</span>
             <span className="hidden md:inline text-slate-300 font-medium">
-              Smart India Hackathon SIH26043
+              {t("sihBanner")}
             </span>
             <span className="hidden lg:inline-flex items-center gap-1 text-emerald-300 bg-[#1E3B2C] px-2 py-0.5 rounded border border-[#2D5A43]">
-              <PhoneCall className="w-3 h-3" /> 24x7 Helpline: 1070 / 112
+              <PhoneCall className="w-3 h-3" /> {t("helplineText")}
             </span>
           </div>
 
@@ -132,27 +133,27 @@ export function Navbar() {
                 {roleDropdownOpen && (
                   <div className="absolute right-0 mt-1 w-72 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl p-2 z-50 text-xs space-y-1">
                     <div className="text-[10px] uppercase font-bold text-slate-400 px-2 py-1">
-                      SIH Demo Personas (no credentials needed):
+                      {t("demoPersonaTitle")}
                     </div>
                     <button
                       onClick={() => handleQuickLogin("SOLVER")}
                       className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-800 text-blue-300 flex items-center justify-between"
                     >
-                      <span>🔬 Solver (Dr. Aarav Mehta)</span>
+                      <span>🔬 {t("demoSolver")}</span>
                       <span className="text-[10px] text-slate-500">BIT Mesra</span>
                     </button>
                     <button
                       onClick={() => handleQuickLogin("CITIZEN")}
                       className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-800 text-emerald-300 flex items-center justify-between"
                     >
-                      <span>👤 Citizen (Priya Sharma)</span>
+                      <span>👤 {t("demoCitizen")}</span>
                       <span className="text-[10px] text-slate-500">Reporter</span>
                     </button>
                     <button
                       onClick={() => handleQuickLogin("INDUSTRY")}
                       className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-800 text-purple-300 flex items-center justify-between"
                     >
-                      <span>🏭 Industry (Tata Steel CSR)</span>
+                      <span>🏭 {t("demoIndustry")}</span>
                       <span className="text-[10px] text-slate-500">Patron</span>
                     </button>
                     {/* ADMIN requires real login — no demo bypass */}
@@ -188,7 +189,7 @@ export function Navbar() {
               {langDropdownOpen && (
                 <div className="absolute right-0 mt-1 w-44 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl p-1.5 z-50 text-xs space-y-1">
                   <div className="text-[10px] font-bold text-slate-400 px-2 py-0.5 uppercase tracking-wider">
-                    Select Language:
+                    {t("selectLanguage")}
                   </div>
 
                   <button

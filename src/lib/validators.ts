@@ -31,8 +31,8 @@ export const ChallengeSchema = z.object({
   district: z.string().min(1, "District is required").max(100),
   state: z.string().min(1, "State is required").max(100),
   pincode: z.string().max(12).optional().nullable(),
-  mediaUrls: z.array(z.string().max(1000)).max(10).optional(),
-  audioUrl: z.string().max(1000).optional().nullable(),
+  mediaUrls: z.array(z.string().max(15_000_000)).max(20).optional(),
+  audioUrl: z.string().max(15_000_000).optional().nullable(),
   voiceTranscript: z.string().max(10000).optional().nullable(),
   language: z.string().max(10).default("en"),
   aiTags: z.array(z.string().max(50)).max(20).optional(),
@@ -48,7 +48,7 @@ export const SolutionSchema = z.object({
   budgetEstimate: z.number().positive().max(1000000000).optional(),
   timelineMonths: z.number().int().positive().max(120).optional(),
   prototypeUrl: z.string().url().max(1000).optional().or(z.literal("")),
-  mediaUrls: z.array(z.string().max(1000)).max(10).optional(),
+  mediaUrls: z.array(z.string().max(15_000_000)).max(20).optional(),
   milestones: z
     .array(
       z.object({
@@ -120,7 +120,7 @@ export const CSRPledgeSchema = z.object({
 
 export const CommentCreateSchema = z.object({
   content: z.string().min(1, "Comment content cannot be empty").max(2000),
-  audioUrl: z.string().max(1000).optional().nullable(),
+  audioUrl: z.string().max(15_000_000).optional().nullable(),
 });
 
 export const ChatMessageSchema = z.object({

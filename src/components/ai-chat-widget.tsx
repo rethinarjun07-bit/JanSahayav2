@@ -5,9 +5,10 @@ import Link from "next/link";
 import {
   MessageCircle, X, Send, Bot, User, Loader2, Mic,
   MicOff, Phone, Copy, Check, RefreshCw, ChevronDown, Sparkles,
-  ArrowUpRight, AlertTriangle, ShieldCheck, MapPin, Activity, FileText
+  ArrowUpRight, AlertTriangle, ShieldCheck, MapPin, Activity, FileText, Globe
 } from "lucide-react";
 import { CopilotAction, CopilotCard } from "@/lib/copilot/types";
+import { useLanguage } from "@/components/language-provider";
 
 interface Message {
   role: "user" | "model";
@@ -20,42 +21,75 @@ interface Message {
   groundedSource?: string;
 }
 
-const QUICK_PROMPTS = [
-  { text: "There is flooding near my village", emoji: "🌧️" },
-  { text: "What problems are active in Ranchi?", emoji: "📍" },
-  { text: "Where is my report?", emoji: "📊" },
-  { text: "Why is my problem high priority?", emoji: "🧠" },
-  { text: "What happens after verification?", emoji: "🏛️" },
-  { text: "Emergency Help 112", emoji: "🚨" },
-];
-
-const TYPING_PHRASES = [
+const TYPING_PHRASES_EN = [
   "Checking JanSahaya data...",
   "Querying local records...",
   "Analyzing civic signals...",
   "Preparing verified response...",
 ];
 
-const INITIAL_WELCOME: Message = {
-  role: "model",
-  text: `🙏 **Namaste! I'm JanSahaya AI.**\n\nI can help you report, understand and track civic & disaster problems across Jharkhand.\n\n**Try asking:**\n• "There is flooding near my village"\n• "Show problems in Ranchi"\n• "Where is my report?"\n• "Why is my problem high priority?"\n• "What should I do during a flood?"`,
-  timestamp: new Date(),
-  lang: "en",
-  actions: [
-    { label: "📝 Report Problem", url: "/challenges/new", variant: "primary" },
-    { label: "📍 Find Local Problems", prompt: "What problems are active in Ranchi?", variant: "outline" },
-    { label: "📊 Track My Report", prompt: "Where is my report?", variant: "outline" },
-    { label: "🚨 Emergency Help", prompt: "I need emergency guidance", variant: "danger" },
-  ],
-};
+const TYPING_PHRASES_HI = [
+  "जनसहाया डेटा जांच रहा हूँ...",
+  "स्थानीय रिकॉर्ड खोज रहा हूँ...",
+  "नागरिक संकेतों का विश्लेषण...",
+  "सत्यापित उत्तर तैयार हो रहा है...",
+];
+
+
+
 
 export default function AIChatWidget() {
+  const { t, language, setLanguage } = useLanguage();
+  const isHindi = language === "hi";
+
+  // Language-aware dynamic quick actions
+  const QUICK_PROMPTS = isHindi ? [
+    { text: "समस्या कैसे दर्ज करें?", emoji: "📝", key: "HOW_TO_REPORT" },
+    { text: "मेरी समस्या ट्रैक करें", emoji: "📊", key: "TRACK_MY_REPORT" },
+    { text: "जनसहाया क्या है?", emoji: "🏛️", key: "WHAT_IS_JANSAHAYA" },
+    { text: "सत्यापन प्रक्रिया क्या है?", emoji: "✅", key: "VERIFICATION_WORKFLOW" },
+    { text: "छात्र और शोधकर्ता कैसे जुड़ें?", emoji: "🎓", key: "STUDENT_HELP" },
+    { text: "कंपनियां कैसे सहयोग कर सकती हैं?", emoji: "🏢", key: "CSR_SUPPORT" },
+    { text: "भाषा बदलें (EN/HI)", emoji: "🌐", key: "CHANGE_LANGUAGE" },
+  ] : [
+    { text: "How do I report a problem?", emoji: "📝", key: "HOW_TO_REPORT" },
+    { text: "Track my problem", emoji: "📊", key: "TRACK_MY_REPORT" },
+    { text: "What is JanSahaya?", emoji: "🏛️", key: "WHAT_IS_JANSAHAYA" },
+    { text: "How does verification work?", emoji: "✅", key: "VERIFICATION_WORKFLOW" },
+    { text: "How can students help?", emoji: "🎓", key: "STUDENT_HELP" },
+    { text: "How can companies support problems?", emoji: "🏢", key: "CSR_SUPPORT" },
+    { text: "Change language (EN/HI)", emoji: "🌐", key: "CHANGE_LANGUAGE" },
+  ];
+
+  const TYPING_PHRASES = isHindi ? TYPING_PHRASES_HI : TYPING_PHRASES_EN;
+
+  // Build welcome message from language-aware translations
+  const buildWelcome = useCallback((hi: boolean): Message => ({
+    role: "model",
+    text: hi
+      ? `🙏 **नमस्ते! मैं जनसहाया AI हूँ।**\n\nमैं झारखंड में नागरिक एवं आपदा समस्याओं को दर्ज करने, समझने और ट्रैक करने में आपकी सहायता करता हूँ।\n\n*ध्यान दें: यह प्रणाली स्वचालित विश्लेषण प्रदान करती है; वैधानिक निर्णय सदैव नामित सरकारी प्राधिकरणों द्वारा लिए जाते हैं।*\n\n**पूछ कर देखें:**\n• "मेरे गाँव के पास बाढ़ आ गई है"\n• "रांची में कौन सी सक्रिय समस्याएं हैं?"\n• "मेरी शिकायत कहाँ तक पहुँची?"`
+      : `🙏 **Namaste! I'm JanSahaya AI.**\n\nI can help you report, understand and track civic & disaster problems across Jharkhand.\n\n*Note: This system provides automated analysis; statutory decisions are always made by designated Government Authorities.*\n\n**Try asking:**\n• "There is flooding near my village"\n• "Show problems in Ranchi"\n• "Where is my report?"`,
+    timestamp: new Date(),
+    lang: hi ? "hi" : "en",
+    actions: hi ? [
+      { label: "📝 समस्या दर्ज करें", url: "/challenges/new", variant: "primary" },
+      { label: "📍 स्थानीय समस्याएं", prompt: "रांची में अभी क्या समस्याएं हैं?", variant: "outline" },
+      { label: "📊 शिकायत ट्रैक करें", prompt: "मेरी शिकायत कहाँ तक पहुँची?", variant: "outline" },
+      { label: "🚨 आपातकालीन सहायता", prompt: "मुझे तत्काल सहायता चाहिए", variant: "danger" },
+    ] : [
+      { label: "📝 Report Problem", url: "/challenges/new", variant: "primary" },
+      { label: "📍 Find Local Problems", prompt: "What problems are active in Ranchi?", variant: "outline" },
+      { label: "📊 Track My Report", prompt: "Where is my report?", variant: "outline" },
+      { label: "🚨 Emergency Help", prompt: "I need emergency guidance", variant: "danger" },
+    ],
+  }), []);
+
   const [open, setOpen] = useState(false);
   const [minimized, setMinimized] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([INITIAL_WELCOME]);
+  const [messages, setMessages] = useState<Message[]>(() => [buildWelcome(false)]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [typingPhrase, setTypingPhrase] = useState(TYPING_PHRASES[0]);
+  const [typingPhrase, setTypingPhrase] = useState(TYPING_PHRASES_EN[0]);
   const [isRecording, setIsRecording] = useState(false);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
@@ -70,6 +104,14 @@ export default function AIChatWidget() {
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const typingInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Reset welcome message and quick prompts when language changes
+  useEffect(() => {
+    setMessages([buildWelcome(isHindi)]);
+    setPreviousIntent(undefined);
+    setPreviousEntities(undefined);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [language]);
 
   // Auto-scroll
   const scrollToBottom = useCallback(() => {
@@ -96,7 +138,8 @@ export default function AIChatWidget() {
     return () => {
       if (typingInterval.current) clearInterval(typingInterval.current);
     };
-  }, [loading]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, language]);
 
   // Track scroll for show-more button
   const handleScroll = () => {
@@ -105,7 +148,31 @@ export default function AIChatWidget() {
     setShowScrollBtn(scrollHeight - scrollTop - clientHeight > 100);
   };
 
+
+  // Handle quick prompt chips — CHANGE_LANGUAGE is handled locally; all others are sent to the API
+  const handleQuickPrompt = (text: string, key: string) => {
+    if (key === "CHANGE_LANGUAGE") {
+      const newLang = isHindi ? "en" : "hi";
+      setLanguage(newLang);
+      // Immediately show a confirmation message in the new language
+      const confirmMsg: Message = {
+        role: "model",
+        text: newLang === "hi"
+          ? "🌐 **भाषा परिवर्तित की गई: हिन्दी**\n\nअब आप हिंदी में प्रश्न पूछ सकते हैं। सभी त्वरित क्रियाएं भी हिंदी में बदल गई हैं।"
+          : "🌐 **Language changed: English**\n\nYou can now ask questions in English. All quick actions have also switched to English.",
+        timestamp: new Date(),
+        lang: newLang,
+        isDemo: false,
+        groundedSource: "JanSahaya Language Engine",
+      };
+      setMessages(prev => [...prev, { role: "user", text, timestamp: new Date() }, confirmMsg]);
+      return;
+    }
+    sendMessage(text);
+  };
+
   const sendMessage = async (text: string) => {
+
     if (!text.trim() || loading) return;
     setInput("");
     setLoading(true);
@@ -214,10 +281,11 @@ export default function AIChatWidget() {
   };
 
   const clearChat = () => {
-    setMessages([INITIAL_WELCOME]);
+    setMessages([buildWelcome(isHindi)]);
     setPreviousIntent(undefined);
     setPreviousEntities(undefined);
   };
+
 
   // Safe React message renderer: avoids dangerouslySetInnerHTML entirely
   // Parses markdown tokens (bold, italic, inline code, line breaks)
@@ -493,13 +561,22 @@ export default function AIChatWidget() {
                         <span>{formatTime(msg.timestamp)}</span>
                         {msg.groundedSource && (
                           <span className="flex items-center gap-0.5 text-emerald-600 font-medium">
-                            <ShieldCheck className="w-2.5 h-2.5" />
-                            verified data
+                            {msg.groundedSource.includes("Gemini") ? (
+                              <>
+                                <Sparkles className="w-2.5 h-2.5 text-blue-600" />
+                                <span className="text-blue-600 font-semibold">Gemini AI</span>
+                              </>
+                            ) : (
+                              <>
+                                <ShieldCheck className="w-2.5 h-2.5 text-emerald-600" />
+                                <span>JanSahaya AI Engine</span>
+                              </>
+                            )}
                           </span>
                         )}
                         {msg.isDemo && (
-                          <span className="px-1 py-0.2 bg-slate-100 text-slate-500 rounded text-[8px]">
-                            offline mode
+                          <span className="px-1.5 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded text-[8px] font-medium">
+                            emergency hotline fallback
                           </span>
                         )}
                       </div>
@@ -541,12 +618,20 @@ export default function AIChatWidget() {
                 <div className="flex gap-1.5" style={{ minWidth: "max-content" }}>
                   {QUICK_PROMPTS.map((p) => (
                     <button
-                      key={p.text}
-                      onClick={() => sendMessage(p.text)}
+                      key={p.key}
+                      onClick={() => handleQuickPrompt(p.text, p.key)}
                       disabled={loading}
-                      className="shrink-0 flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1.5 bg-slate-50 hover:bg-blue-50 disabled:opacity-50 text-slate-700 hover:text-blue-700 border border-slate-200 hover:border-blue-200 rounded-xl transition-colors whitespace-nowrap active:scale-95"
+                      className={`shrink-0 flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1.5 disabled:opacity-50 border rounded-xl transition-colors whitespace-nowrap active:scale-95 ${
+                        p.key === "CHANGE_LANGUAGE"
+                          ? "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200 hover:border-emerald-300"
+                          : "bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border-slate-200 hover:border-blue-200"
+                      }`}
                     >
-                      <span>{p.emoji}</span> {p.text}
+                      {p.key === "CHANGE_LANGUAGE" ? (
+                        <Globe className="w-3 h-3" />
+                      ) : (
+                        <span>{p.emoji}</span>
+                      )}{" "}{p.text}
                     </button>
                   ))}
                 </div>
@@ -575,7 +660,7 @@ export default function AIChatWidget() {
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage(input)}
-                    placeholder={isRecording ? "🎙️ Listening..." : "Ask in Hindi, English or Hinglish..."}
+                    placeholder={isRecording ? (isHindi ? "🎙️ सुन रहा हूँ..." : "🎙️ Listening...") : t("chatbotInputPlaceholder")}
                     disabled={loading}
                     className="w-full text-xs px-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:opacity-60 bg-slate-50 focus:bg-white transition-colors"
                   />

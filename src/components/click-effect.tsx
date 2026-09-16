@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useEffect, useState, useCallback } from "react";
 import { sound } from "@/lib/sound";
@@ -46,24 +46,25 @@ export function ClickEffectProvider() {
       'button, a, input, select, textarea, [role="button"], .interactive-pop, .cursor-pointer'
     );
 
-    if (isInteractive) {
-      // Soft tactile audio feedback
-      try {
-        sound.playClick();
-      } catch {
-        // AudioContext error safeguard
-      }
+    // Only fire effects on interactive targets — keeps the civic portal clean & professional
+    if (!isInteractive) return;
+
+    // Soft tactile audio feedback
+    try {
+      sound.playClick();
+    } catch {
+      // AudioContext error safeguard
     }
 
-    // Add ripple
-    setRipples((prev) => [...prev.slice(-6), { id: now, x, y }]);
+    // Add a subtle ripple on interactive click
+    setRipples((prev) => [...prev.slice(-4), { id: now, x, y }]);
 
-    // Spawn 6 radial popping particles
+    // Spawn 4 minimal popping particles (reduced from 6, less visual noise)
     const newParticles: ClickParticle[] = [];
-    const count = 6;
+    const count = 4;
     for (let i = 0; i < count; i++) {
-      const angle = (i * (360 / count) + Math.random() * 20 - 10) * (Math.PI / 180);
-      const distance = 24 + Math.random() * 24;
+      const angle = (i * (360 / count) + Math.random() * 15 - 7.5) * (Math.PI / 180);
+      const distance = 18 + Math.random() * 16;
       newParticles.push({
         id: now + i + 1,
         x,
@@ -71,21 +72,21 @@ export function ClickEffectProvider() {
         tx: Math.cos(angle) * distance,
         ty: Math.sin(angle) * distance,
         color: PARTICLE_COLORS[Math.floor(Math.random() * PARTICLE_COLORS.length)],
-        size: 3 + Math.random() * 3,
+        size: 2.5 + Math.random() * 2,
       });
     }
 
-    setParticles((prev) => [...prev.slice(-18), ...newParticles]);
+    setParticles((prev) => [...prev.slice(-12), ...newParticles]);
 
     // Clean up ripple after animation
     setTimeout(() => {
       setRipples((prev) => prev.filter((r) => r.id !== now));
-    }, 600);
+    }, 500);
 
     // Clean up particles
     setTimeout(() => {
       setParticles((prev) => prev.filter((p) => !newParticles.some((np) => np.id === p.id)));
-    }, 550);
+    }, 450);
   }, []);
 
   useEffect(() => {

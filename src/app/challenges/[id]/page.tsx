@@ -32,45 +32,50 @@ interface PageProps {
 export default async function ChallengeDetailPage({ params }: PageProps) {
   const { id } = params;
 
-  const challenge = await db.challenge.findUnique({
-    where: { id },
-    include: {
-      createdBy: {
-        select: { id: true, name: true, role: true, organization: true, district: true, state: true, karmaPoints: true },
-      },
-      solutions: {
-        include: {
-          author: {
-            select: { id: true, name: true, organization: true, designation: true, role: true, karmaPoints: true },
-          },
-          milestones: {
-            orderBy: { order: "asc" },
-          },
-          reviews: {
-            include: {
-              reviewer: { select: { id: true, name: true, role: true, organization: true } },
+  let challenge: any = null;
+  try {
+    challenge = await db.challenge.findUnique({
+      where: { id },
+      include: {
+        createdBy: {
+          select: { id: true, name: true, role: true, organization: true, district: true, state: true, karmaPoints: true },
+        },
+        solutions: {
+          include: {
+            author: {
+              select: { id: true, name: true, organization: true, designation: true, role: true, karmaPoints: true },
+            },
+            milestones: {
+              orderBy: { order: "asc" },
+            },
+            reviews: {
+              include: {
+                reviewer: { select: { id: true, name: true, role: true, organization: true } },
+              },
+            },
+            _count: {
+              select: { upvotes: true, comments: true },
             },
           },
-          _count: {
-            select: { upvotes: true, comments: true },
+        },
+        duplicates: {
+          select: { id: true, title: true, district: true, createdAt: true, status: true },
+        },
+        masterChallenge: {
+          select: { id: true, title: true, district: true, status: true },
+        },
+        comments: {
+          include: {
+            user: { select: { id: true, name: true, role: true, organization: true } },
           },
+          orderBy: { createdAt: "desc" },
         },
+        upvotes: true,
       },
-      duplicates: {
-        select: { id: true, title: true, district: true, createdAt: true, status: true },
-      },
-      masterChallenge: {
-        select: { id: true, title: true, district: true, status: true },
-      },
-      comments: {
-        include: {
-          user: { select: { id: true, name: true, role: true, organization: true } },
-        },
-        orderBy: { createdAt: "desc" },
-      },
-      upvotes: true,
-    },
-  });
+    });
+  } catch (err) {
+    console.warn("Database query failed in ChallengeDetailPage:", err);
+  }
 
   if (!challenge) {
     notFound();

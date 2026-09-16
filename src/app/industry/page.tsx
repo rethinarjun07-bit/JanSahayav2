@@ -17,22 +17,29 @@ import { PagePop, PopItem } from "@/components/page-pop-transition";
 export const dynamic = "force-dynamic";
 
 export default async function IndustryPortalPage() {
-  const vettedChallenges = await db.challenge.findMany({
-    where: { status: { in: ["VERIFIED", "ASSIGNED", "IN_PROGRESS"] } },
-    include: {
-      solutions: {
-        include: {
-          author: true,
-          milestones: true,
+  let vettedChallenges: any[] = [];
+  let industryUsers: any[] = [];
+
+  try {
+    vettedChallenges = await db.challenge.findMany({
+      where: { status: { in: ["VERIFIED", "ASSIGNED", "IN_PROGRESS"] } },
+      include: {
+        solutions: {
+          include: {
+            author: true,
+            milestones: true,
+          },
         },
       },
-    },
-    take: 8,
-  });
+      take: 8,
+    });
 
-  const industryUsers = await db.user.findMany({
-    where: { role: "INDUSTRY" },
-  });
+    industryUsers = await db.user.findMany({
+      where: { role: "INDUSTRY" },
+    });
+  } catch (err) {
+    console.warn("Database query failed in IndustryPortalPage, using fallback:", err);
+  }
 
   return (
     <PagePop className="min-h-screen bg-slate-50 py-10 px-4 sm:px-6 lg:px-8">

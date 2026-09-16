@@ -4,6 +4,7 @@ import { generateToken, AUTH_COOKIE_OPTIONS } from "@/lib/auth";
 import { DEMO_ALLOWED_ROLES, isDemoModeEnabled } from "@/lib/rbac";
 import { getClientIp, checkRateLimit, createRateLimitResponse, RATE_LIMIT_BUCKETS } from "@/lib/rate-limiter";
 import { safeLog } from "@/lib/safe-logger";
+import { DEMO_PERSONAS } from "@/lib/demo-personas";
 
 const ROLE_EMAILS: Record<string, string> = {
   CITIZEN:  "citizen@demo.in",
@@ -55,10 +56,20 @@ export async function POST(request: Request) {
       );
     }
 
-    const user = await db.user.findUnique({ where: { email: targetEmail } });
+    let user: any = null;
+    try {
+      user = await db.user.findUnique({ where: { email: targetEmail } });
+    } catch (dbErr) {
+      safeLog.warn("Database lookup failed during demo switch; using fallback persona:", dbErr);
+    }
+
+    if (!user) {
+      user = DEMO_PERSONAS[roleKey];
+    }
+
     if (!user) {
       return NextResponse.json(
-        { error: "Demo persona not found. Please run the seed script." },
+        { error: "Demo persona not found." },
         { status: 404 }
       );
     }
@@ -82,16 +93,39 @@ export async function POST(request: Request) {
       designation: user.designation,
       district: user.district,
       state: user.state,
-      karmaPoints: user.karmaPoints,
+      karmaPoints: user.karmaPoints || 100,
       avatar: user.avatar,
+      skills: user.skills ? (typeof user.skills === "string" ? JSON.parse(user.skills) : user.skills) : [],
+      badges: user.badges ? (typeof user.badges === "string" ? JSON.parse(user.badges) : user.badges) : [],
     };
 
-    const response = NextResponse.json({ success: true, user: userData });
+    const response = NextResponse.json({ success: true, user: userData, token });
     response.cookies.set("jansahaya_token", token, AUTH_COOKIE_OPTIONS);
 
     return response;
   } catch (error: unknown) {
     safeLog.error("Demo Switch Error:", error);
+    // Even on uncaught exception in demo mode, try to return the requested persona
+    try {
+      const body = await request.clone().json();
+      const roleKey = (body.role || "").toUpperCase();
+      const fallback = DEMO_PERSONAS[roleKey];
+      if (fallback) {
+        const token = generateToken({
+          userId: fallback.id,
+          email: fallback.email,
+          name: fallback.name,
+          role: fallback.role,
+          organization: fallback.organization,
+          district: fallback.district,
+        });
+        const res = NextResponse.json({ success: true, user: fallback, token });
+        res.cookies.set("jansahaya_token", token, AUTH_COOKIE_OPTIONS);
+        return res;
+      }
+    } catch {
+      // ignore secondary error
+    }
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

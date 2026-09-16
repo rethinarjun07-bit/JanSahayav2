@@ -26,30 +26,35 @@ const LeafletMap = createDynamicComponent(() => import("@/components/leaflet-map
 });
 
 export default async function FullScreenMapPage() {
-  const challenges = await db.challenge.findMany({
-    where: { status: { not: "MERGED" } },
-    select: {
-      id: true,
-      title: true,
-      category: true,
-      severity: true,
-      urgencyScore: true,
-      latitude: true,
-      longitude: true,
-      district: true,
-      state: true,
-      status: true,
-      address: true,
-      _count: {
-        select: { upvotes: true, duplicates: true },
+  let challenges: any[] = [];
+  try {
+    challenges = await db.challenge.findMany({
+      where: { status: { not: "MERGED" } },
+      select: {
+        id: true,
+        title: true,
+        category: true,
+        severity: true,
+        urgencyScore: true,
+        latitude: true,
+        longitude: true,
+        district: true,
+        state: true,
+        status: true,
+        address: true,
+        _count: {
+          select: { upvotes: true, duplicates: true },
+        },
       },
-    },
-  });
+    });
+  } catch (err) {
+    console.warn("Database query failed in FullScreenMapPage, using empty fallback:", err);
+  }
 
   const formattedChallenges = challenges.map((c) => ({
     ...c,
-    upvotesCount: c._count.upvotes,
-    mergedCount: c._count.duplicates,
+    upvotesCount: c._count?.upvotes ?? 0,
+    mergedCount: c._count?.duplicates ?? 0,
   }));
 
   return (

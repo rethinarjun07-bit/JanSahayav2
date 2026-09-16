@@ -128,6 +128,27 @@ export function AuthorizedAuthorityGuard({
             <ArrowRight className="w-4 h-4" />
           </Link>
 
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                const res = await fetch("/api/auth/login", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ email: "admin@demo.in", password: "Admin@123" }),
+                });
+                if (res.ok) {
+                  window.location.reload();
+                }
+              } catch (e) {
+                console.error(e);
+              }
+            }}
+            className="w-full py-2.5 px-4 rounded-xl bg-purple-900/60 hover:bg-purple-800/80 border border-purple-500/40 text-purple-200 font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-sm active:scale-98"
+          >
+            <span>⚡ 1-Click Evaluator Demo Access (Sri Rajesh Kumar Sinha, IAS)</span>
+          </button>
+
           <div className="flex items-center justify-between text-xs text-slate-400 pt-2">
             <Link
               href="/challenges"

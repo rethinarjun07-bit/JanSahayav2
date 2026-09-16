@@ -7,6 +7,7 @@ import { evaluateDuplicates } from "@/lib/nlp/tfidf";
 import { getClientIp, checkRateLimit, createRateLimitResponse, RATE_LIMIT_BUCKETS } from "@/lib/rate-limiter";
 import { safeLog } from "@/lib/safe-logger";
 import { isDemoModeEnabled } from "@/lib/rbac";
+import { DEMO_CHALLENGES } from "@/lib/demo-data";
 
 export const dynamic = "force-dynamic";
 
@@ -55,23 +56,37 @@ export async function GET(request: Request) {
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "50", 10) || 50));
     const skip = (page - 1) * limit;
 
-    const [totalCount, challenges] = await Promise.all([
-      db.challenge.count({ where }),
-      db.challenge.findMany({
-        where,
-        orderBy: [{ urgencyScore: "desc" }, { createdAt: "desc" }],
-        skip,
-        take: limit,
-        include: {
-          createdBy: {
-            select: { id: true, name: true, role: true, organization: true },
+    let totalCount = 0;
+    let challenges: any[] = [];
+
+    try {
+      const [count, items] = await Promise.all([
+        db.challenge.count({ where }),
+        db.challenge.findMany({
+          where,
+          orderBy: [{ urgencyScore: "desc" }, { createdAt: "desc" }],
+          skip,
+          take: limit,
+          include: {
+            createdBy: {
+              select: { id: true, name: true, role: true, organization: true },
+            },
+            _count: {
+              select: { solutions: true, upvotes: true, comments: true, duplicates: true },
+            },
           },
-          _count: {
-            select: { solutions: true, upvotes: true, comments: true, duplicates: true },
-          },
-        },
-      }),
-    ]);
+        }),
+      ]);
+      totalCount = count;
+      challenges = items;
+    } catch (dbErr) {
+      console.warn("Database unavailable in GET /api/challenges, serving demo challenges:", dbErr);
+      challenges = DEMO_CHALLENGES.map((c) => ({
+        ...c,
+        _count: { solutions: 1, upvotes: 12, comments: 4, duplicates: 1 },
+      }));
+      totalCount = challenges.length;
+    }
 
     const now = new Date().getTime();
 
@@ -130,6 +145,10 @@ export async function POST(request: Request) {
     }
 
     let creatorId = session?.userId;
+    if (creatorId) {
+      const existingUser = await db.user.findUnique({ where: { id: creatorId }, select: { id: true } });
+      if (!existingUser) creatorId = undefined;
+    }
 
     if (!creatorId) {
       // In production, reject unauthenticated challenge submissions (fails closed)
@@ -141,7 +160,7 @@ export async function POST(request: Request) {
       }
 
       // Fallback to demo citizen user in demo mode
-      const defaultCitizen = await db.user.findFirst({ where: { role: "CITIZEN" } });
+      const defaultCitizen = (await db.user.findFirst({ where: { role: "CITIZEN" } })) || (await db.user.findFirst());
       if (!defaultCitizen) {
         return NextResponse.json({ error: "Authentication required" }, { status: 401 });
       }

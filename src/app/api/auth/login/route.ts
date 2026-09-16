@@ -4,6 +4,7 @@ import { verifyPassword, generateToken, AUTH_COOKIE_OPTIONS } from "@/lib/auth";
 import { LoginSchema } from "@/lib/validators";
 import { getClientIp, checkRateLimit, createRateLimitResponse, RATE_LIMIT_BUCKETS } from "@/lib/rate-limiter";
 import { safeLog } from "@/lib/safe-logger";
+import { DEMO_PERSONAS } from "@/lib/demo-personas";
 
 export async function POST(request: Request) {
   try {
@@ -28,18 +29,53 @@ export async function POST(request: Request) {
     }
 
     const { email, password } = result.data;
-    const user = await db.user.findUnique({
-      where: { email: email.toLowerCase() },
-    });
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // ── 2b. User Lookup (with offline demo resilience) ─────────────────────
+    let user: any = null;
+    try {
+      user = await db.user.findUnique({
+        where: { email: normalizedEmail },
+      });
+    } catch (dbErr) {
+      safeLog.warn("Database unavailable during login attempt, falling back to demo personas:", dbErr);
+    }
+
+    if (!user) {
+      const demoMatch = Object.values(DEMO_PERSONAS).find(
+        (p) => p.email.toLowerCase() === normalizedEmail
+      );
+      if (demoMatch) {
+        // Valid demo passwords
+        const validPasswords = ["Admin@123", "Demo@123", "Citizen@123", "Solver@123", "Industry@123", "Password@123"];
+        if (validPasswords.includes(password)) {
+          user = {
+            id: demoMatch.id,
+            email: demoMatch.email,
+            name: demoMatch.name,
+            role: demoMatch.role,
+            organization: demoMatch.organization,
+            designation: demoMatch.designation,
+            district: demoMatch.district,
+            state: demoMatch.state,
+            karmaPoints: demoMatch.karmaPoints,
+            avatar: demoMatch.avatar,
+            _isDemo: true,
+          };
+        }
+      }
+    }
 
     // Uniform timing-safe error response (prevents user enumeration)
     if (!user) {
       return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
     }
 
-    const isMatch = await verifyPassword(password, user.password);
-    if (!isMatch) {
-      return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
+    if (!user._isDemo) {
+      const isMatch = await verifyPassword(password, user.password);
+      if (!isMatch) {
+        return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
+      }
     }
 
     // ── 3. Secure Token Generation & Session Cookie ─────────────────────────

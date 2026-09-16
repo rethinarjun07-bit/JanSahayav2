@@ -5,19 +5,28 @@ import db from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { AuthorizedAuthorityGuard } from "@/components/authorized-authority-guard";
 import { UniversityAssignmentClient } from "./university-assignment-client";
+import { DEMO_CHALLENGES, DEMO_UNIVERSITIES } from "@/lib/demo-data";
 
 export const dynamic = "force-dynamic";
 
 export default async function UniversityAssignmentsPage() {
   const currentUser = await getCurrentUser();
 
-  const challenges = await db.challenge.findMany({
-    where: { status: { in: ["SUBMITTED", "VERIFIED", "ASSIGNED"] } },
-    orderBy: [{ urgencyScore: "desc" }, { createdAt: "desc" }],
-    include: { createdBy: true },
-  });
+  let challenges: any[] = [];
+  let universities: any[] = [];
 
-  const universities = await db.university.findMany();
+  try {
+    challenges = await db.challenge.findMany({
+      where: { status: { in: ["SUBMITTED", "VERIFIED", "ASSIGNED"] } },
+      orderBy: [{ urgencyScore: "desc" }, { createdAt: "desc" }],
+      include: { createdBy: true },
+    });
+
+    universities = await db.university.findMany();
+  } catch (err) {
+    challenges = DEMO_CHALLENGES.filter((c) => ["SUBMITTED", "VERIFIED", "ASSIGNED"].includes(c.status));
+    universities = DEMO_UNIVERSITIES;
+  }
 
   return (
     <AuthorizedAuthorityGuard

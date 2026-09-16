@@ -20,6 +20,31 @@ function AdminLoginInner() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const handleQuickAdminDemo = async () => {
+    setEmail("admin@demo.in");
+    setPassword("Admin@123");
+    sound.playClick();
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "admin@demo.in", password: "Admin@123" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Authentication failed");
+      sound.playCelebration();
+      router.push(from && from !== "/login" ? from : "/admin");
+      router.refresh();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Authentication failed");
+      sound.playAlert();
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     sound.playClick();
@@ -221,6 +246,16 @@ function AdminLoginInner() {
               <LogIn className="w-4 h-4" />
               {loading ? "Verifying Official Credentials..." : "Sign In as Government Authority"}
             </motion.button>
+
+            <button
+              type="button"
+              disabled={loading}
+              onClick={handleQuickAdminDemo}
+              className="w-full py-2.5 bg-purple-950/70 hover:bg-purple-900/80 border border-purple-500/40 text-purple-200 font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 active:scale-98 disabled:opacity-50"
+            >
+              <KeyRound className="w-3.5 h-3.5 text-purple-300" />
+              <span>⚡ 1-Click SIH Judge Demo Access (admin@demo.in)</span>
+            </button>
           </form>
 
           {/* No self-registration for admin */}

@@ -18,6 +18,8 @@ import {
   ChevronDown,
   RotateCcw,
   Sparkles,
+  ShieldAlert,
+  MousePointer,
 } from "lucide-react";
 import { sound } from "@/lib/sound";
 
@@ -146,11 +148,14 @@ export default function LeafletMap({
   // States
   const [activeBaseLayer, setActiveBaseLayer] = useState<BaseLayerType>("streets");
   const [showBufferZones, setShowBufferZones] = useState<boolean>(true);
+  const [bufferMode, setBufferMode] = useState<"multi" | "standard" | "max">("multi");
+  const [showBufferMenu, setShowBufferMenu] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [activeCategoryFilter, setActiveCategoryFilter] = useState<string>("All");
   const [showLayerMenu, setShowLayerMenu] = useState<boolean>(false);
   const [showHubMenu, setShowHubMenu] = useState<boolean>(false);
   const [showLegend, setShowLegend] = useState<boolean>(false);
+  const [wheelZoomEnabled, setWheelZoomEnabled] = useState<boolean>(false);
 
   // Measurement tool states
   const [isMeasuring, setIsMeasuring] = useState<boolean>(false);
@@ -177,19 +182,14 @@ export default function LeafletMap({
   onLocationSelectRef.current = onLocationSelect;
   const interactiveSelectRef = useRef(interactiveSelect);
   interactiveSelectRef.current = interactiveSelect;
+  const visibleChallengesRef = useRef(visibleChallenges);
+  visibleChallengesRef.current = visibleChallenges;
+  const isMeasuringRef = useRef(isMeasuring);
+  isMeasuringRef.current = isMeasuring;
 
   // Initialize Leaflet Map
   useEffect(() => {
     if (typeof window === "undefined") return;
-
-    // Load Leaflet CSS
-    if (!document.getElementById("leaflet-css")) {
-      const link = document.createElement("link");
-      link.id = "leaflet-css";
-      link.rel = "stylesheet";
-      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-      document.head.appendChild(link);
-    }
 
     import("leaflet").then((L) => {
       LRef.current = L;
@@ -212,8 +212,31 @@ export default function LeafletMap({
         center: [initLat, initLng],
         zoom: initZoom,
         zoomControl: false,
-        scrollWheelZoom: true,
+        scrollWheelZoom: false, // Prevents uncontrolled zooming when moving mouse or scrolling page
+        doubleClickZoom: true,
+        touchZoom: true,
+        boxZoom: true,
+        dragging: true,
       });
+
+      // Google Maps style: allow Ctrl + Wheel to zoom smoothly without scroll traps
+      const mapContainerEl = mapContainerRef.current;
+      if (mapContainerEl) {
+        mapContainerEl.addEventListener(
+          "wheel",
+          (e: WheelEvent) => {
+            if (e.ctrlKey || e.metaKey) {
+              e.preventDefault();
+              if (e.deltaY < 0) {
+                map.zoomIn(1);
+              } else if (e.deltaY > 0) {
+                map.zoomOut(1);
+              }
+            }
+          },
+          { passive: false }
+        );
+      }
 
       // Defensive wrap for flyTo and setView
       const origFlyTo = map.flyTo.bind(map);
@@ -272,7 +295,7 @@ export default function LeafletMap({
       // Map Click Event
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       map.on("click", (e: any) => {
-        if (isMeasuring) {
+        if (isMeasuringRef.current) {
           handleMeasureClick(e.latlng);
           return;
         }
@@ -286,7 +309,91 @@ export default function LeafletMap({
               lng: Number(cLng.toFixed(4)),
             });
           }
+          return;
         }
+
+        // Map Exploration Click: Show problem(s) in this area
+        const clickLat = Number(e.latlng.lat);
+        const clickLng = Number(e.latlng.lng);
+        if (!isValidCoordinate(clickLat, clickLng)) return;
+
+        const challengesList = visibleChallengesRef.current || [];
+        const nearby = challengesList
+          .map((ch) => {
+            const distMeters = map.distance([clickLat, clickLng], [Number(ch.latitude), Number(ch.longitude)]);
+            return {
+              ...ch,
+              distanceKm: distMeters / 1000,
+            };
+          })
+          .filter((ch) => Number.isFinite(ch.distanceKm) && ch.distanceKm <= 35)
+          .sort((a, b) => a.distanceKm - b.distanceKm);
+
+        const areaPopupContent = nearby.length > 0
+          ? `
+            <div style="font-family: system-ui, -apple-system, sans-serif; width: 280px; overflow: hidden;">
+              <div style="padding: 12px 14px; background: #ffffff;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; border-bottom: 1px solid #f1f5f9; padding-bottom: 6px;">
+                  <span style="font-size: 11px; font-weight: 800; color: #0f172a; display: flex; align-items: center; gap: 5px;">
+                    📍 Sector Focus
+                  </span>
+                  <span style="font-size: 10px; font-weight: 800; background: #fee2e2; color: #dc2626; padding: 2px 6px; border-radius: 4px;">
+                    ${nearby.length} Incident${nearby.length > 1 ? "s" : ""} Nearby
+                  </span>
+                </div>
+                <p style="margin: 0 0 8px 0; font-size: 11px; color: #64748b;">
+                  Active hazards within 35 km of this area:
+                </p>
+                <div style="display: flex; flex-direction: column; gap: 6px; max-height: 180px; overflow-y: auto;">
+                  ${nearby.slice(0, 3).map((item) => `
+                    <div style="padding: 6px 8px; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0;">
+                      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px;">
+                        <span style="font-size: 10px; font-weight: 700; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px;">
+                          ${item.title}
+                        </span>
+                        <span style="font-size: 9px; font-weight: 800; color: #dc2626;">
+                          ${item.severity}
+                        </span>
+                      </div>
+                      <div style="display: flex; align-items: center; justify-content: space-between; font-size: 10px; color: #64748b;">
+                        <span>📍 ${item.district} (~${item.distanceKm.toFixed(1)} km)</span>
+                        <a href="/challenges/${item.id}" style="color: #0284c7; font-weight: 700; text-decoration: none;">
+                          Inspect &rarr;
+                        </a>
+                      </div>
+                    </div>
+                  `).join("")}
+                </div>
+                <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center;">
+                  <span style="font-size: 10px; color: #64748b;">Lat: ${clickLat.toFixed(3)}, Lng: ${clickLng.toFixed(3)}</span>
+                  <a href="/challenges/new?lat=${clickLat.toFixed(4)}&lng=${clickLng.toFixed(4)}" style="background: #003366; color: white; padding: 4px 8px; border-radius: 5px; font-size: 10px; font-weight: 700; text-decoration: none;">
+                    + Post Here
+                  </a>
+                </div>
+              </div>
+            </div>
+          `
+          : `
+            <div style="font-family: system-ui, -apple-system, sans-serif; width: 260px; padding: 12px 14px; background: #ffffff;">
+              <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+                <span style="font-size: 14px;">🟢</span>
+                <span style="font-size: 12px; font-weight: 800; color: #0f172a;">Sector Monitored</span>
+              </div>
+              <p style="margin: 0 0 8px 0; font-size: 11px; color: #64748b; line-height: 1.4;">
+                No active disaster incidents reported within a 35 km radius of coordinates [${clickLat.toFixed(3)}, ${clickLng.toFixed(3)}].
+              </p>
+              <div style="display: flex; justify-content: flex-end; margin-top: 6px;">
+                <a href="/challenges/new?lat=${clickLat.toFixed(4)}&lng=${clickLng.toFixed(4)}" style="background: #003366; color: white; padding: 5px 10px; border-radius: 6px; font-size: 10px; font-weight: 700; text-decoration: none;">
+                  + Report Issue in this Area &rarr;
+                </a>
+              </div>
+            </div>
+          `;
+
+        L.popup({ maxWidth: 300, className: "custom-leaflet-popup", autoPan: false })
+          .setLatLng([clickLat, clickLng])
+          .setContent(areaPopupContent)
+          .openOn(map);
       });
     });
 
@@ -300,7 +407,11 @@ export default function LeafletMap({
         mapInstanceRef.current = null;
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const selectedLat = selectedLocation?.lat;
+  const selectedLng = selectedLocation?.lng;
 
   // Pan to selected location when changed from outside
   useEffect(() => {
@@ -324,7 +435,10 @@ export default function LeafletMap({
     } catch (err) {
       console.warn("Leaflet pan/flyTo suppressed error:", err);
     }
-  }, [selectedLocation?.lat, selectedLocation?.lng]);
+  }, [selectedLocation, selectedLat, selectedLng]);
+
+  const centerLat = center?.[0];
+  const centerLng = center?.[1];
 
   // Center & zoom sync
   useEffect(() => {
@@ -339,7 +453,7 @@ export default function LeafletMap({
     } catch (err) {
       console.warn("Leaflet setView error suppressed:", err);
     }
-  }, [center?.[0], center?.[1], zoom]);
+  }, [center, centerLat, centerLng, zoom]);
 
   // Update Base Tile Layer when changed
   useEffect(() => {
@@ -359,6 +473,17 @@ export default function LeafletMap({
 
     baseTileLayerRef.current = newTile;
   }, [activeBaseLayer]);
+
+  // Sync wheel zoom toggle state
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !map.scrollWheelZoom) return;
+    if (wheelZoomEnabled) {
+      map.scrollWheelZoom.enable();
+    } else {
+      map.scrollWheelZoom.disable();
+    }
+  }, [wheelZoomEnabled]);
 
   // Handle Measurement tool clicks
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -565,7 +690,7 @@ export default function LeafletMap({
                 Lat: ${pinLat}, Lng: ${pinLng}
               </span>
             </div>
-          `)
+          `, { autoPan: false })
           .openPopup();
       } catch (err) {
         console.warn("Marker creation error suppressed:", err);
@@ -586,36 +711,124 @@ export default function LeafletMap({
       const isCritical = challenge.severity === "CRITICAL";
       const isHigh = challenge.severity === "HIGH";
 
-      // Draw Buffer Zone (Vulnerability / Hazard Influence Corridor)
+      // Draw Advanced Risk Buffer Zones (Multi-tier Vulnerability Corridors)
       if (showBufferZones && (isCritical || isHigh)) {
-        const radiusMeters = isCritical ? 2400 : 1200;
-        const circle = L.circle([cLat, cLng], {
-          radius: radiusMeters,
-          color: isCritical ? "#dc2626" : meta.color,
-          fillColor: isCritical ? "#fee2e2" : meta.color,
-          fillOpacity: isCritical ? 0.22 : 0.14,
-          weight: isCritical ? 2 : 1,
-          dashArray: isCritical ? "4, 4" : undefined,
-        }).addTo(bufferZonesLayer);
+        const createBufferZone = (radiusMeters: number, isCore: boolean) => {
+          const strokeColor = isCore ? (isCritical ? "#dc2626" : meta.color) : "#ea580c";
+          const fillColor = isCore ? (isCritical ? "#fee2e2" : meta.color) : "#ffedd5";
+          const fillOpacity = isCore ? (isCritical ? 0.22 : 0.15) : 0.08;
+          const weight = isCore ? (isCritical ? 2.5 : 1.5) : 1;
 
-        circle.bindTooltip(
-          `<b>${isCritical ? "🔥 Critical Hazard Corridor" : "Vulnerability Buffer"}</b><br/>~${(radiusMeters / 1000).toFixed(1)} km radius (~${challenge.citizenCountAffected || 250}+ residents exposed)`,
-          { sticky: true, className: "buffer-tooltip" }
-        );
+          const circle = L.circle([cLat, cLng], {
+            radius: radiusMeters,
+            color: strokeColor,
+            fillColor: fillColor,
+            fillOpacity: fillOpacity,
+            weight: weight,
+            dashArray: isCritical ? "5, 5" : "3, 3",
+            interactive: true,
+          }).addTo(bufferZonesLayer);
+
+          // Interactive buffer click: Show Advanced Hazard Corridor Telemetry Card
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          circle.on("click", (e: any) => {
+            if (e?.originalEvent) {
+              L.DomEvent.stopPropagation(e.originalEvent);
+              L.DomEvent.preventDefault(e.originalEvent);
+            }
+
+            const exposedCount = Math.round((challenge.citizenCountAffected || 350) * (radiusMeters / 1200));
+            const bufferTitle = isCore
+              ? (isCritical ? "🔥 Core Disaster Epicenter" : "Primary Hazard Corridor")
+              : "Secondary Advisory Perimeter";
+
+            const popupHtml = `
+              <div style="font-family: system-ui, -apple-system, sans-serif; width: 285px; overflow: hidden;">
+                <div style="padding: 12px 14px; background: #ffffff;">
+                  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                    <span style="font-size: 9px; font-weight: 800; background: ${isCritical ? '#fee2e2' : '#ffedd5'}; color: ${isCritical ? '#dc2626' : '#ea580c'}; padding: 2px 7px; border-radius: 4px;">
+                      🛡️ ${bufferTitle.toUpperCase()}
+                    </span>
+                    <span style="font-size: 9px; font-weight: 800; color: #64748b;">
+                      ~${(radiusMeters / 1000).toFixed(1)} km Buffer
+                    </span>
+                  </div>
+
+                  <h4 style="margin: 0 0 6px 0; font-size: 13px; font-weight: 700; color: #0f172a; line-height: 1.35;">
+                    ${challenge.title}
+                  </h4>
+
+                  <div style="font-size: 11px; color: #475569; display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px;">
+                    <div>📍 <b>${challenge.district}</b> · ${challenge.address || "Sector Focus"}</div>
+                    <div>👥 Population in Buffer: <b>~${exposedCount}+ citizens exposed</b></div>
+                    <div style="font-size: 10px; color: #475569; background: #f8fafc; padding: 5px 7px; border-radius: 6px; border: 1px solid #e2e8f0;">
+                      ⚡ <b>Mitigation Directive:</b> ${
+                        isCritical
+                          ? "High-alert containment corridor: Deploy SDRF & initiate resident advisory."
+                          : "Monitoring buffer: Standard civic response & barrier checks."
+                      }
+                    </div>
+                  </div>
+
+                  <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 8px; border-top: 1px solid #f1f5f9;">
+                    <span style="font-size: 10px; font-weight: 700; color: #0284c7;">
+                      Urgency: ${challenge.urgencyScore || 70}/100
+                    </span>
+                    <a href="/challenges/${challenge.id}" style="background: #003366; color: white; padding: 5px 10px; border-radius: 6px; font-size: 10px; font-weight: 700; text-decoration: none;">
+                      Inspect Problem &rarr;
+                    </a>
+                  </div>
+                </div>
+              </div>
+            `;
+
+            L.popup({ maxWidth: 295, className: "custom-leaflet-popup", autoPan: false })
+              .setLatLng(e.latlng)
+              .setContent(popupHtml)
+              .openOn(map);
+          });
+
+          // Safe Hover Tooltip
+          try {
+            circle.bindTooltip(
+              `<b>${isCore ? (isCritical ? "🔥 Core Impact Zone" : "Hazard Buffer") : "Outer Advisory Perimeter"}</b><br/>~${(radiusMeters / 1000).toFixed(1)} km radius · ~${Math.round((challenge.citizenCountAffected || 350) * (radiusMeters / 1200))}+ exposed`,
+              { sticky: true, className: "buffer-tooltip" }
+            );
+          } catch {
+            // Tooltip suppressed safely
+          }
+        };
+
+        if (bufferMode === "multi") {
+          // Inner core zone
+          createBufferZone(isCritical ? 1400 : 900, true);
+          // Outer staging perimeter for critical hazards
+          if (isCritical) {
+            createBufferZone(2800, false);
+          }
+        } else if (bufferMode === "max") {
+          createBufferZone(isCritical ? 4200 : 2500, true);
+        } else {
+          // Standard
+          createBufferZone(isCritical ? 2000 : 1200, true);
+        }
       }
 
       // Marker Icon
       const markerHtml = `
-        <div style="position: relative; display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; cursor: pointer;">
+        <div style="position: relative; display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; cursor: pointer; user-select: none;">
           ${
             isCritical
               ? `<div class="radar-pulse-ring" style="
                   position: absolute;
+                  top: -7px;
+                  left: -7px;
                   width: 48px;
                   height: 48px;
                   border-radius: 50%;
                   border: 2px solid ${meta.color};
                   background: ${meta.color}25;
+                  pointer-events: none;
                 "></div>`
               : ""
           }
@@ -634,7 +847,6 @@ export default function LeafletMap({
             color: white;
             font-size: ${isCritical ? "13px" : "11px"};
             font-weight: 800;
-            transition: transform 0.2s;
           ">
             ${meta.icon}
           </div>
@@ -653,6 +865,7 @@ export default function LeafletMap({
                   border-radius: 10px;
                   border: 1px solid white;
                   box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+                  pointer-events: none;
                 ">
                   ${challenge.mergedCount}
                 </span>`
@@ -757,14 +970,22 @@ export default function LeafletMap({
       `;
 
       try {
-        L.marker([cLat, cLng], { icon: customIcon })
+        const marker = L.marker([cLat, cLng], { icon: customIcon, keyboard: false });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        marker.on("click", (e: any) => {
+          if (e?.originalEvent) {
+            L.DomEvent.stopPropagation(e.originalEvent);
+            L.DomEvent.preventDefault(e.originalEvent);
+          }
+        });
+        marker
           .addTo(markersLayer)
-          .bindPopup(popupContent, { maxWidth: 280, className: "custom-leaflet-popup" });
+          .bindPopup(popupContent, { maxWidth: 280, className: "custom-leaflet-popup", autoPan: false });
       } catch (err) {
         console.warn("Marker bindPopup error:", err);
       }
     });
-  }, [visibleChallenges, selectedLocation, showBufferZones]);
+  }, [visibleChallenges, selectedLocation, showBufferZones, bufferMode]);
 
   return (
     <div
@@ -854,23 +1075,117 @@ export default function LeafletMap({
             )}
           </div>
 
-          {/* Buffer Zones Toggle */}
-          <button
-            type="button"
-            onClick={() => {
-              sound.playClick();
-              setShowBufferZones(!showBufferZones);
-            }}
-            title={showBufferZones ? "Hide Hazard Buffer Zones" : "Show Hazard Buffer Zones"}
-            className={`backdrop-blur-md px-3 py-1.5 rounded-xl shadow-md border text-xs font-bold flex items-center gap-1.5 transition-colors ${
-              showBufferZones
-                ? "bg-amber-50 text-amber-900 border-amber-300"
-                : "bg-white/95 text-slate-700 border-slate-200/80 hover:bg-slate-50"
-            }`}
-          >
-            {showBufferZones ? <Eye className="w-3.5 h-3.5 text-amber-600" /> : <EyeOff className="w-3.5 h-3.5 text-slate-400" />}
-            <span className="hidden sm:inline">Risk Buffers</span>
-          </button>
+          {/* Advanced Risk Buffer Control Center Dropdown */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                sound.playClick();
+                setShowBufferMenu(!showBufferMenu);
+                setShowHubMenu(false);
+                setShowLayerMenu(false);
+              }}
+              title="Configure Hazard Risk Corridors"
+              className={`backdrop-blur-md px-3 py-1.5 rounded-xl shadow-md border text-xs font-bold flex items-center gap-1.5 transition-colors ${
+                showBufferZones
+                  ? "bg-amber-50 text-amber-900 border-amber-300"
+                  : "bg-white/95 text-slate-700 border-slate-200/80 hover:bg-slate-50"
+              }`}
+            >
+              <ShieldAlert className="w-3.5 h-3.5 text-amber-600" />
+              <span>Risk Buffers</span>
+              <span className={`px-1.5 py-0.2 text-[9px] rounded-md font-extrabold ${
+                showBufferZones ? "bg-amber-200 text-amber-900" : "bg-slate-200 text-slate-600"
+              }`}>
+                {showBufferZones ? (bufferMode === "multi" ? "Multi-Tier" : bufferMode === "max" ? "4.2km" : "Standard") : "Off"}
+              </span>
+              <ChevronDown className="w-3.5 h-3.5 ml-0.5 text-slate-400" />
+            </button>
+
+            {showBufferMenu && (
+              <div className="absolute top-full left-0 mt-1.5 w-64 bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-slate-200 p-2.5 z-50 text-xs space-y-2">
+                <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
+                  <span className="text-[10px] uppercase font-bold text-slate-400">
+                    Hazard Buffer Analysis
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowBufferZones(!showBufferZones);
+                      setShowBufferMenu(false);
+                    }}
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                      showBufferZones ? "bg-red-100 text-red-700 hover:bg-red-200" : "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                    }`}
+                  >
+                    {showBufferZones ? "Turn Off" : "Turn On"}
+                  </button>
+                </div>
+
+                <div className="space-y-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sound.playClick();
+                      setShowBufferZones(true);
+                      setBufferMode("multi");
+                      setShowBufferMenu(false);
+                    }}
+                    className={`w-full text-left px-2.5 py-1.5 rounded-xl font-semibold transition-colors flex items-center justify-between ${
+                      showBufferZones && bufferMode === "multi" ? "bg-amber-500 text-white" : "text-slate-700 hover:bg-slate-100"
+                    }`}
+                  >
+                    <div>
+                      <div className="font-bold">🎯 Multi-Tier Corridors</div>
+                      <div className={`text-[10px] ${showBufferZones && bufferMode === "multi" ? "text-amber-100" : "text-slate-500"}`}>
+                        Core 1.4km + Staging 2.8km perimeter
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sound.playClick();
+                      setShowBufferZones(true);
+                      setBufferMode("standard");
+                      setShowBufferMenu(false);
+                    }}
+                    className={`w-full text-left px-2.5 py-1.5 rounded-xl font-semibold transition-colors flex items-center justify-between ${
+                      showBufferZones && bufferMode === "standard" ? "bg-amber-500 text-white" : "text-slate-700 hover:bg-slate-100"
+                    }`}
+                  >
+                    <div>
+                      <div className="font-bold">📏 Standard Buffer (1.5 - 2.0km)</div>
+                      <div className={`text-[10px] ${showBufferZones && bufferMode === "standard" ? "text-amber-100" : "text-slate-500"}`}>
+                        Standard disaster radius zone
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sound.playClick();
+                      setShowBufferZones(true);
+                      setBufferMode("max");
+                      setShowBufferMenu(false);
+                    }}
+                    className={`w-full text-left px-2.5 py-1.5 rounded-xl font-semibold transition-colors flex items-center justify-between ${
+                      showBufferZones && bufferMode === "max" ? "bg-amber-500 text-white" : "text-slate-700 hover:bg-slate-100"
+                    }`}
+                  >
+                    <div>
+                      <div className="font-bold">⚡ Max Extent (4.2km)</div>
+                      <div className={`text-[10px] ${showBufferZones && bufferMode === "max" ? "text-amber-100" : "text-slate-500"}`}>
+                        Extended evacuation & fallout zone
+                      </div>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Geodesic Distance Measurement Ruler */}
           <button
@@ -892,6 +1207,28 @@ export default function LeafletMap({
           >
             <Ruler className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">{isMeasuring ? "Exit Ruler" : "Measure Distance"}</span>
+          </button>
+
+          {/* Wheel Zoom Mode Toggle */}
+          <button
+            type="button"
+            onClick={() => {
+              sound.playClick();
+              setWheelZoomEnabled(!wheelZoomEnabled);
+            }}
+            title={
+              wheelZoomEnabled
+                ? "Wheel Zoom is Active (Scroll wheel directly zooms map)"
+                : "Wheel Zoom is Protected (Hold Ctrl + Scroll to zoom, or click to enable free wheel zoom)"
+            }
+            className={`backdrop-blur-md px-2.5 py-1.5 rounded-xl shadow-md border text-xs font-bold flex items-center gap-1 transition-colors ${
+              wheelZoomEnabled
+                ? "bg-indigo-50 text-indigo-900 border-indigo-300"
+                : "bg-white/95 text-slate-700 border-slate-200/80 hover:bg-slate-50"
+            }`}
+          >
+            <MousePointer className={`w-3.5 h-3.5 ${wheelZoomEnabled ? "text-indigo-600" : "text-slate-500"}`} />
+            <span className="hidden sm:inline">Zoom: {wheelZoomEnabled ? "Wheel Free" : "Ctrl/Pinch"}</span>
           </button>
 
           {/* Fit All Pins */}

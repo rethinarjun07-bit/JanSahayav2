@@ -26,35 +26,40 @@ interface Props {
 export default async function SolutionDetailPage({ params }: Props) {
   const { id } = params;
 
-  const solution = await db.solution.findUnique({
-    where: { id },
-    include: {
-      author: true,
-      challenge: {
-        include: {
-          createdBy: true,
+  let solution: any = null;
+  try {
+    solution = await db.solution.findUnique({
+      where: { id },
+      include: {
+        author: true,
+        challenge: {
+          include: {
+            createdBy: true,
+          },
+        },
+        milestones: {
+          orderBy: { order: "asc" },
+        },
+        reviews: {
+          include: {
+            reviewer: true,
+          },
+          orderBy: { createdAt: "desc" },
+        },
+        comments: {
+          include: {
+            user: true,
+          },
+          orderBy: { createdAt: "desc" },
+        },
+        _count: {
+          select: { upvotes: true, comments: true },
         },
       },
-      milestones: {
-        orderBy: { order: "asc" },
-      },
-      reviews: {
-        include: {
-          reviewer: true,
-        },
-        orderBy: { createdAt: "desc" },
-      },
-      comments: {
-        include: {
-          user: true,
-        },
-        orderBy: { createdAt: "desc" },
-      },
-      _count: {
-        select: { upvotes: true, comments: true },
-      },
-    },
-  });
+    });
+  } catch (err) {
+    console.warn("Database query failed in SolutionDetailPage:", err);
+  }
 
   if (!solution) {
     notFound();

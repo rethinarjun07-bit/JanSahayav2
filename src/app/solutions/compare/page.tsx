@@ -12,9 +12,30 @@ interface Props {
 export default async function CompareSolutionsPage({ searchParams }: Props) {
   const challengeId = searchParams.challengeId;
 
-  let challenge = challengeId
-    ? await db.challenge.findUnique({
-        where: { id: challengeId },
+  let challenge: any = null;
+  try {
+    challenge = challengeId
+      ? await db.challenge.findUnique({
+          where: { id: challengeId },
+          include: {
+            solutions: {
+              include: {
+                author: true,
+                milestones: true,
+                reviews: true,
+              },
+            },
+          },
+        })
+      : null;
+
+    if (!challenge) {
+      challenge = await db.challenge.findFirst({
+        where: {
+          solutions: {
+            some: {},
+          },
+        },
         include: {
           solutions: {
             include: {
@@ -24,26 +45,10 @@ export default async function CompareSolutionsPage({ searchParams }: Props) {
             },
           },
         },
-      })
-    : null;
-
-  if (!challenge) {
-    challenge = await db.challenge.findFirst({
-      where: {
-        solutions: {
-          some: {},
-        },
-      },
-      include: {
-        solutions: {
-          include: {
-            author: true,
-            milestones: true,
-            reviews: true,
-          },
-        },
-      },
-    });
+      });
+    }
+  } catch (err) {
+    console.warn("Database query failed in CompareSolutionsPage:", err);
   }
 
   const solutions = challenge?.solutions || [];

@@ -16,15 +16,22 @@ import db from "@/lib/db";
 export const dynamic = "force-dynamic";
 
 export default async function LeaderboardPage() {
-  const solvers = await db.user.findMany({
-    where: { role: "SOLVER" },
-    orderBy: { karmaPoints: "desc" },
-    include: {
-      _count: { select: { solutions: true } },
-    },
-  });
+  let solvers: any[] = [];
+  let universities: any[] = [];
 
-  const universities = await db.university.findMany();
+  try {
+    solvers = await db.user.findMany({
+      where: { role: "SOLVER" },
+      orderBy: { karmaPoints: "desc" },
+      include: {
+        _count: { select: { solutions: true } },
+      },
+    });
+
+    universities = await db.university.findMany();
+  } catch (err) {
+    console.warn("Database query failed in LeaderboardPage, using fallback:", err);
+  }
 
   const topThree = solvers.slice(0, 3);
   const restSolvers = solvers.slice(3);

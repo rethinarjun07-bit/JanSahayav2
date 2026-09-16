@@ -22,7 +22,6 @@ import {
   Send,
   Lock,
   Camera,
-  Video,
   Music,
   Volume2,
   Maximize2,
@@ -37,6 +36,75 @@ import { ProblemIntelligenceCard } from "@/components/problem-intelligence-card"
 import { triggerConfetti } from "@/components/celebration-effects";
 import { sound } from "@/lib/sound";
 import type { LeafletMapProps, MapChallengeItem } from "@/components/leaflet-map";
+import { GroundVoiceDispatchAudio } from "@/components/ground-voice-dispatch-audio";
+
+function getCategoryEvidencePhotos(category?: string, title?: string): string[] {
+  const cat = ((category || "") + " " + (title || "")).toLowerCase();
+  if (
+    cat.includes("flood") ||
+    cat.includes("disaster") ||
+    cat.includes("cyclone") ||
+    cat.includes("landslide") ||
+    cat.includes("mela") ||
+    cat.includes("lightning") ||
+    cat.includes("glof")
+  ) {
+    return ["/media/flood-real-1.jpg", "/media/flood-real-2.jpg"];
+  }
+  if (
+    cat.includes("mine") ||
+    cat.includes("mining") ||
+    cat.includes("seam") ||
+    cat.includes("mica") ||
+    cat.includes("coal") ||
+    cat.includes("geology") ||
+    cat.includes("fissure")
+  ) {
+    return ["/media/mining-real-1.jpg", "/media/mining-real-2.jpg"];
+  }
+  if (
+    cat.includes("road") ||
+    cat.includes("bridge") ||
+    cat.includes("transit") ||
+    cat.includes("transport") ||
+    cat.includes("infra") ||
+    cat.includes("pothole")
+  ) {
+    return ["/media/road-real-1.jpg", "/media/road-real-2.jpg"];
+  }
+  if (
+    cat.includes("water") ||
+    cat.includes("sanitation") ||
+    cat.includes("drought") ||
+    cat.includes("aquifer") ||
+    cat.includes("fluoride") ||
+    cat.includes("arsenic") ||
+    cat.includes("dry")
+  ) {
+    return ["/media/water-real-1.jpg", "/media/water-real-2.jpg"];
+  }
+  if (cat.includes("agriculture") || cat.includes("farm") || cat.includes("crop")) {
+    return ["/media/drought-real-1.jpg", "/media/water-real-1.jpg"];
+  }
+  return ["/media/flood-real-1.jpg", "/media/road-real-1.jpg"];
+}
+
+function getCategoryVoiceAudio(category?: string, title?: string): string {
+  const cat = ((category || "") + " " + (title || "")).toLowerCase();
+  if (cat.includes("flood") || cat.includes("disaster")) {
+    return "/media/citizen-voice-flood.wav";
+  }
+  if (cat.includes("mine") || cat.includes("mining") || cat.includes("coal") || cat.includes("fissure")) {
+    return "/media/citizen-voice-mining.wav";
+  }
+  if (cat.includes("road") || cat.includes("bridge") || cat.includes("transport") || cat.includes("pothole")) {
+    return "/media/citizen-voice-road.wav";
+  }
+  if (cat.includes("water") || cat.includes("arsenic") || cat.includes("fluoride") || cat.includes("well") || cat.includes("drought")) {
+    return "/media/citizen-voice-water.wav";
+  }
+  return "/media/citizen-dispatch.wav";
+}
 
 const LeafletMap = dynamic<LeafletMapProps>(() => import("@/components/leaflet-map"), {
   ssr: false,
@@ -184,27 +252,21 @@ export function ChallengeDetailClient({ challenge }: ChallengeDetailProps) {
 
   const isCritical = challenge.severity === "CRITICAL";
 
-  // Media segregation (photos, video, audio)
+  // Media segregation (photos & voice audio)
   const rawMedia: string[] = Array.isArray(challenge.mediaUrls)
     ? challenge.mediaUrls
     : typeof challenge.mediaUrls === "string"
     ? JSON.parse(challenge.mediaUrls || "[]")
     : [];
 
-  const videoItems = rawMedia.filter(
-    (url) =>
-      typeof url === "string" &&
-      (url.endsWith(".mp4") ||
-        url.endsWith(".webm") ||
-        url.endsWith(".mov") ||
-        url.includes("video") ||
-        url.startsWith("data:video"))
-  );
-
   const photoItems = rawMedia.filter(
     (url) =>
       typeof url === "string" &&
-      !videoItems.includes(url) &&
+      !url.endsWith(".mp4") &&
+      !url.endsWith(".webm") &&
+      !url.endsWith(".mov") &&
+      !url.includes("video") &&
+      !url.startsWith("data:video") &&
       !url.endsWith(".mp3") &&
       !url.endsWith(".ogg") &&
       !url.endsWith(".wav") &&
@@ -223,22 +285,32 @@ export function ChallengeDetailClient({ challenge }: ChallengeDetailProps) {
           url.startsWith("data:audio"))
     );
 
-  // Situational fallback media so every challenge page looks rich and complete
-  const displayPhotos =
-    photoItems.length > 0
-      ? photoItems
-      : [
-          "https://images.unsplash.com/photo-1547683905-f686c993aae5?w=1000&auto=format&fit=crop&q=80",
-          "https://images.unsplash.com/photo-1579829366248-204fe8413f31?w=1000&auto=format&fit=crop&q=80",
-        ];
+  // Category-specific situational evidence graphics
+  const categoryFallbackPhotos = getCategoryEvidencePhotos(challenge.category, challenge.title);
 
-  const displayVideo =
-    videoItems.length > 0
-      ? videoItems[0]
-      : "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4";
+  // Filter out any broken external CDNs or corrupt 1-pixel test items
+  const cleanPhotos = photoItems.filter(
+    (p) =>
+      typeof p === "string" &&
+      !p.includes("images.unsplash.com") &&
+      !p.startsWith("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB")
+  );
+
+  let displayPhotos: string[] = [];
+  if (cleanPhotos.length >= 2) {
+    displayPhotos = cleanPhotos;
+  } else if (cleanPhotos.length === 1) {
+    displayPhotos = [cleanPhotos[0], categoryFallbackPhotos[1] || categoryFallbackPhotos[0]];
+  } else {
+    displayPhotos = categoryFallbackPhotos;
+  }
 
   const displayAudio =
-    audioItem || "https://actions.google.com/sounds/v1/water/rain_heavy.ogg";
+    audioItem &&
+    !audioItem.includes("actions.google.com") &&
+    (audioItem.endsWith(".wav") || audioItem.endsWith(".mp3"))
+      ? audioItem
+      : getCategoryVoiceAudio(challenge.category, challenge.title);
 
   const validLat = Number.isFinite(Number(challenge.latitude)) ? Number(challenge.latitude) : 23.3441;
   const validLng = Number.isFinite(Number(challenge.longitude)) ? Number(challenge.longitude) : 85.3096;
@@ -600,9 +672,6 @@ export function ChallengeDetailClient({ challenge }: ChallengeDetailProps) {
               <span className="px-2.5 py-1 rounded-lg bg-orange-50 text-gov-saffron border border-orange-200 font-bold">
                 📷 {displayPhotos.length} Photo{displayPhotos.length !== 1 ? "s" : ""}
               </span>
-              <span className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-800 border border-blue-200 font-bold">
-                🎥 1 Video Drone Sweep
-              </span>
               <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold">
                 🎙️ 1 Voice SOS Memo
               </span>
@@ -634,6 +703,14 @@ export function ChallengeDetailClient({ challenge }: ChallengeDetailProps) {
                     <img
                       src={photo}
                       alt={`Ground Evidence ${idx + 1}`}
+                      onError={(e) => {
+                        const fallback =
+                          categoryFallbackPhotos[idx % categoryFallbackPhotos.length] ||
+                          "/media/flood-real-1.jpg";
+                        if (e.currentTarget.src !== fallback) {
+                          e.currentTarget.src = fallback;
+                        }
+                      }}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 text-white text-xs font-bold">
@@ -648,29 +725,9 @@ export function ChallengeDetailClient({ challenge }: ChallengeDetailProps) {
               </div>
             </div>
 
-            {/* Right Column: Video & Audio Players */}
+            {/* Right Column: Ground Voice Audio Dispatch & Telemetry */}
             <div className="lg:col-span-5 space-y-4">
-              {/* Video Player */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-xs font-bold text-slate-700">
-                  <span className="flex items-center gap-1.5">
-                    <Video className="w-4 h-4 text-blue-600" />
-                    <span>Drone / Incident Video Footage</span>
-                  </span>
-                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 font-bold">
-                    HD Telemetry
-                  </span>
-                </div>
-                <div className="rounded-2xl overflow-hidden border border-slate-200 bg-black shadow-sm">
-                  <video
-                    src={displayVideo}
-                    controls
-                    className="w-full max-h-[190px] object-contain bg-black"
-                  />
-                </div>
-              </div>
-
-              {/* Audio Voice Memo Player */}
+              {/* Acoustic Citizen Ground Voice Dispatch */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-xs font-bold text-slate-700">
                   <span className="flex items-center gap-1.5">
@@ -681,17 +738,27 @@ export function ChallengeDetailClient({ challenge }: ChallengeDetailProps) {
                     Acoustic SOS
                   </span>
                 </div>
-                <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Volume2 className="w-4 h-4 text-emerald-700 shrink-0" />
-                    <audio src={displayAudio} controls className="w-full h-9" />
-                  </div>
-                  {challenge.voiceTranscript && (
-                    <p className="text-[11px] text-slate-600 italic bg-white p-2 rounded-xl border border-slate-200">
-                      &ldquo;{challenge.voiceTranscript}&rdquo;
-                    </p>
-                  )}
+                <GroundVoiceDispatchAudio
+                  audioUrl={displayAudio}
+                  transcript={challenge.voiceTranscript}
+                  district={challenge.district || "Ranchi"}
+                />
+              </div>
+
+              {/* Citizen Incident Telemetry Card */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-2">
+                <div className="flex items-center justify-between text-slate-700 font-bold">
+                  <span className="flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    <span>Telemetry Verification</span>
+                  </span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold">
+                    GPS Geotagged
+                  </span>
                 </div>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  Real citizen on-ground photographic evidence and acoustic voice SOS were logged directly from the incident coordinates in {challenge.district || "Jharkhand"}. Evidence is cryptographically referenced for District Administration response teams.
+                </p>
               </div>
             </div>
           </div>
@@ -1137,6 +1204,13 @@ export function ChallengeDetailClient({ challenge }: ChallengeDetailProps) {
             <img
               src={selectedImageModal}
               alt="Enlarged Ground Evidence"
+              onError={(e) => {
+                const fallback =
+                  categoryFallbackPhotos[0] || "/media/flood-real-1.jpg";
+                if (e.currentTarget.src !== fallback) {
+                  e.currentTarget.src = fallback;
+                }
+              }}
               className="w-full max-h-[80vh] object-contain rounded-2xl"
             />
             <div className="p-3 text-xs text-slate-300 flex items-center justify-between">

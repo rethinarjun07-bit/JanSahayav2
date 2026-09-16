@@ -1,10 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from "react";
-import { DICTIONARY, PHRASE_MAP, Language } from "@/lib/i18n";
-
-
-type TranslationKey = keyof typeof DICTIONARY["en"];
+import { DICTIONARY, PHRASE_MAP, Language, TranslationKey } from "@/lib/i18n";
 
 interface LanguageContextType {
   language: Language;
@@ -32,15 +29,12 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       const currentDict = DICTIONARY[language] as Record<string, string>;
       const enDict = DICTIONARY.en as Record<string, string>;
 
-      // 1. Check exact dictionary key
+      // 1. Check exact dictionary key in active language
       if (currentDict && currentDict[keyOrText]) {
         return currentDict[keyOrText];
       }
-      if (enDict && enDict[keyOrText]) {
-        return enDict[keyOrText];
-      }
 
-      // 2. Check phrase lookup map
+      // 2. Check phrase lookup map (translates English string directly to Hindi/Urdu)
       if (language !== "en" && PHRASE_MAP[language]) {
         const trimmed = keyOrText.trim();
         if (PHRASE_MAP[language][trimmed]) {
@@ -48,12 +42,17 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
+      // 3. Fallback to English dictionary key if key exists
+      if (enDict && enDict[keyOrText]) {
+        return enDict[keyOrText];
+      }
+
       return keyOrText;
     },
     [language]
   );
 
-  // Initialize from storage on mount
+  // Initialize from localStorage on mount
   useEffect(() => {
     if (typeof window === "undefined") return;
     const saved = localStorage.getItem("jansahaya_lang") as Language;
@@ -65,7 +64,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Update DOM attributes and dynamic phrase replacement when language changes
+  // Update DOM attributes and subtle text replacements
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -98,49 +97,49 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     const currentMap = PHRASE_MAP[language];
     if (!currentMap) return;
 
-    // Translate text nodes in DOM that match dictionary phrases
-    const phrases = Object.keys(currentMap);
-    if (phrases.length === 0) return;
-
     const translateNodes = () => {
-      const walker = document.createTreeWalker(
-        document.body,
-        NodeFilter.SHOW_TEXT,
-        {
-          acceptNode(node) {
-            const parent = node.parentElement;
-            if (!parent) return NodeFilter.FILTER_REJECT;
-            const tag = parent.tagName.toLowerCase();
-            if (
-              tag === "script" ||
-              tag === "style" ||
-              tag === "code" ||
-              tag === "pre" ||
-              tag === "input" ||
-              tag === "textarea"
-            ) {
-              return NodeFilter.FILTER_REJECT;
-            }
-            return NodeFilter.FILTER_ACCEPT;
-          },
-        }
-      );
-
-      let node = walker.nextNode();
-      while (node) {
-        const currentVal = node.nodeValue?.trim();
-        if (currentVal && currentMap[currentVal]) {
-          if (!originalTextMap.current.has(node)) {
-            originalTextMap.current.set(node, node.nodeValue!);
+      try {
+        const walker = document.createTreeWalker(
+          document.body,
+          NodeFilter.SHOW_TEXT,
+          {
+            acceptNode(node) {
+              const parent = node.parentElement;
+              if (!parent) return NodeFilter.FILTER_REJECT;
+              const tag = parent.tagName.toLowerCase();
+              if (
+                tag === "script" ||
+                tag === "style" ||
+                tag === "code" ||
+                tag === "pre" ||
+                tag === "input" ||
+                tag === "textarea" ||
+                parent.isContentEditable
+              ) {
+                return NodeFilter.FILTER_REJECT;
+              }
+              return NodeFilter.FILTER_ACCEPT;
+            },
           }
-          node.nodeValue = currentMap[currentVal];
+        );
+
+        let node = walker.nextNode();
+        while (node) {
+          const currentVal = node.nodeValue?.trim();
+          if (currentVal && currentMap[currentVal]) {
+            if (!originalTextMap.current.has(node)) {
+              originalTextMap.current.set(node, node.nodeValue!);
+            }
+            node.nodeValue = currentMap[currentVal];
+          }
+          node = walker.nextNode();
         }
-        node = walker.nextNode();
+      } catch {
+        // Safe tree-walker fallback
       }
     };
 
     translateNodes();
-    // Re-run briefly on DOM updates
     const timer = setTimeout(translateNodes, 300);
     return () => clearTimeout(timer);
   }, [language]);

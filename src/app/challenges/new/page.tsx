@@ -16,7 +16,6 @@ import {
   ArrowLeft,
   Navigation,
   Camera,
-  Video,
   Music,
   Trash2,
   Plus,
@@ -24,7 +23,6 @@ import {
   Square,
   Volume2,
   Layers,
-  FileVideo,
   Image as ImageIcon,
   Check,
   Flame,
@@ -78,11 +76,6 @@ const SAMPLE_DISASTER_PHOTOS = [
   },
 ];
 
-const SAMPLE_DRONE_VIDEO = {
-  name: "Govt UAV Emergency Corridor Sweep (.mp4)",
-  url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-};
-
 const SAMPLE_AUDIO_MEMO = {
   name: "Citizen SOS Distress Voice Dispatch (.mp3)",
   url: "https://actions.google.com/sounds/v1/water/rain_heavy.ogg",
@@ -105,7 +98,6 @@ export default function NewChallengePage() {
 
   // Multimedia States
   const [photos, setPhotos] = useState<string[]>([]);
-  const [videoUrl, setVideoUrl] = useState<string>("");
   const [audioUrl, setAudioUrl] = useState<string>("");
   const [voiceTranscript, setVoiceTranscript] = useState<string>("");
   const [recordingAudio, setRecordingAudio] = useState(false);
@@ -395,12 +387,30 @@ export default function NewChallengePage() {
   };
 
   // Photo handlers
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     sound.playClick();
 
-    Array.from(files).forEach((file) => {
+    for (const file of Array.from(files)) {
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        const res = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.url) {
+            setPhotos((prev) => [...prev, data.url]);
+            continue;
+          }
+        }
+      } catch {
+        // Fallback to dataURL
+      }
+
       const reader = new FileReader();
       reader.onloadend = () => {
         if (reader.result) {
@@ -408,7 +418,7 @@ export default function NewChallengePage() {
         }
       };
       reader.readAsDataURL(file);
-    });
+    }
   };
 
   const handleRemovePhoto = (index: number) => {
@@ -421,20 +431,6 @@ export default function NewChallengePage() {
     if (!photos.includes(url)) {
       setPhotos((prev) => [...prev, url]);
     }
-  };
-
-  // Video handlers
-  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    sound.playClick();
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      if (reader.result) {
-        setVideoUrl(reader.result as string);
-      }
-    };
-    reader.readAsDataURL(file);
   };
 
   // Audio recording handlers
@@ -452,8 +448,29 @@ export default function NewChallengePage() {
         }
       };
 
-      mediaRecorder.onstop = () => {
+      mediaRecorder.onstop = async () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        try {
+          const audioFile = new File([audioBlob], `dispatch-${Date.now()}.webm`, { type: "audio/webm" });
+          const formData = new FormData();
+          formData.append("file", audioFile);
+          const res = await fetch("/api/upload", {
+            method: "POST",
+            body: formData,
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.url) {
+              setAudioUrl(data.url);
+              sound.playCelebration();
+              stream.getTracks().forEach((track) => track.stop());
+              return;
+            }
+          }
+        } catch {
+          // Fallback to dataURL
+        }
+
         const reader = new FileReader();
         reader.readAsDataURL(audioBlob);
         reader.onloadend = () => {
@@ -519,7 +536,7 @@ export default function NewChallengePage() {
     const resolvedAddress = address.trim() || `${district}, ${state}`;
 
     try {
-      const combinedMediaUrls = [...photos, ...(videoUrl ? [videoUrl] : [])];
+      const combinedMediaUrls = [...photos];
 
       const res = await fetch("/api/challenges", {
         method: "POST",
@@ -575,9 +592,11 @@ export default function NewChallengePage() {
             href="/challenges"
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-[#1A3D2F] transition-colors"
           >
-            <ArrowLeft className="w-3.5 h-3.5" /> Back to Catalog
+            <ArrowLeft className="w-3.5 h-3.5" /> {language === "hi" ? "कैटलॉग पर वापस जाएं" : "Back to Catalog"}
           </Link>
-          <span className="text-xs font-bold text-slate-500">Step {step} of 4</span>
+          <span className="text-xs font-bold text-slate-500">
+            {language === "hi" ? `चरण ${step} / 4` : `Step ${step} of 4`}
+          </span>
         </div>
 
         {/* Wizard Progress Bar */}
@@ -594,11 +613,11 @@ export default function NewChallengePage() {
             <div>
               <div className="flex items-center gap-2 mb-1.5">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-[#C05621] bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">
-                  Citizen & Field Ground Intake
+                  {language === "hi" ? "नागरिक एवं ज़मीनी प्रविष्टि" : "Citizen & Field Ground Intake"}
                 </span>
                 <span className="text-xs font-semibold text-slate-400">&bull;</span>
                 <span className="text-[11px] font-semibold text-slate-600">
-                  Disaster Mitigation Cell (SIH26043)
+                  {language === "hi" ? "आपदा न्यूनीकरण प्रकोष्ठ (SIH26043)" : "Disaster Mitigation Cell (SIH26043)"}
                 </span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 font-serif">
@@ -658,7 +677,9 @@ export default function NewChallengePage() {
                     className="w-full text-xs sm:text-sm p-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-gov-navy focus:outline-none placeholder:text-slate-400 font-medium"
                   />
                   <p className="text-[11px] text-slate-500 mt-1.5">
-                    Be specific with landmarks, nature of damage, and affected areas.
+                    {language === "hi"
+                      ? "स्थान, क्षति की प्रकृति और प्रभावित क्षेत्रों के बारे में विशिष्ट विवरण दें।"
+                      : "Be specific with landmarks, nature of damage, and affected areas."}
                   </p>
                 </div>
 
@@ -694,7 +715,7 @@ export default function NewChallengePage() {
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
-                    className="w-full text-xs sm:text-sm p-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-gov-navy focus:outline-none bg-white text-slate-800 font-medium"
+                    className="w-full text-xs sm:text-sm p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-gov-navy focus:outline-none bg-white text-slate-800 font-medium"
                   >
                     {CATEGORIES.map((c) => (
                       <option key={c} value={c}>
@@ -715,9 +736,13 @@ export default function NewChallengePage() {
                     <MapPin className="w-4 h-4" />
                   </span>
                   <div>
-                    <div className="font-bold text-blue-950">Interactive GIS Map Pinning & Auto-Detect</div>
+                    <div className="font-bold text-blue-950">
+                      {language === "hi" ? "इंटरैक्टिव जीआईएस मानचित्र एवं स्वतः स्थान पहचान" : "Interactive GIS Map Pinning & Auto-Detect"}
+                    </div>
                     <div className="text-slate-600 text-[11px]">
-                      Click anywhere on the map or tap Auto-Detect to automatically populate State, District, and Landmark.
+                      {language === "hi"
+                        ? "मानचित्र पर कहीं भी क्लिक करें या राज्य, जिला और सीमाचिह्न स्वतः भरने के लिए 'जीपीएस से स्थान प्राप्त करें' पर टैप करें।"
+                        : "Click anywhere on the map or tap Auto-Detect to automatically populate State, District, and Landmark."}
                     </div>
                   </div>
                 </div>
@@ -730,7 +755,7 @@ export default function NewChallengePage() {
                   {isDetectingLocation ? (
                     <>
                       <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
-                      <span>Detecting Location...</span>
+                      <span>{language === "hi" ? "स्थान खोजा जा रहा है..." : "Detecting Location..."}</span>
                     </>
                   ) : (
                     <>
@@ -751,7 +776,7 @@ export default function NewChallengePage() {
               {isReverseGeocoding && (
                 <div className="p-2.5 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-xs font-medium flex items-center gap-2 animate-pulse">
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-600 shrink-0" />
-                  <span>Pin dropped! Fetching place address, district and state...</span>
+                  <span>{language === "hi" ? "पिन लगाया गया! पता प्राप्त किया जा रहा है..." : "Pin dropped! Fetching place address, district and state..."}</span>
                 </div>
               )}
 
@@ -779,7 +804,7 @@ export default function NewChallengePage() {
               {/* Location Form Inputs */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">State</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">{t("stateLabel")}</label>
                   <select
                     value={state}
                     onChange={(e) => handleStateChange(e.target.value)}
@@ -795,7 +820,7 @@ export default function NewChallengePage() {
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
-                    District ({availableDistricts.length} in {state})
+                    {t("districtLabel")} ({availableDistricts.length})
                   </label>
                   <select
                     value={district}
@@ -813,7 +838,7 @@ export default function NewChallengePage() {
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Specific Location / Landmark
+                  {t("landmarkLabel")}
                 </label>
                 <input
                   type="text"
@@ -831,7 +856,9 @@ export default function NewChallengePage() {
 
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Latitude</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    {language === "hi" ? "अक्षांश (Latitude)" : "Latitude"}
+                  </label>
                   <input
                     type="number"
                     step="any"
@@ -846,7 +873,9 @@ export default function NewChallengePage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Longitude</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    {language === "hi" ? "देशांतर (Longitude)" : "Longitude"}
+                  </label>
                   <input
                     type="number"
                     step="any"
@@ -861,7 +890,9 @@ export default function NewChallengePage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Pincode</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    {language === "hi" ? "पिन कोड (Pincode)" : "Pincode"}
+                  </label>
                   <input
                     type="text"
                     value={pincode || ""}
@@ -874,7 +905,7 @@ export default function NewChallengePage() {
             </div>
             )}
 
-            {/* STEP 3: Multimedia Disaster Evidence (Photos, Video, Audio) */}
+            {/* STEP 3: Multimedia Disaster Evidence (Photos & Audio Memo) */}
             {step === 3 && (
               <div className="space-y-6">
                 {/* 1. PHOTO EVIDENCE SECTION */}
@@ -886,17 +917,17 @@ export default function NewChallengePage() {
                       </div>
                       <div>
                         <h3 className="text-sm font-bold text-slate-900">
-                          Photo Evidence Gallery ({photos.length})
+                          {t("photoEvidenceTitle")} ({photos.length})
                         </h3>
                         <p className="text-[11px] text-slate-500">
-                          Upload high-resolution field photos or select sample incident captures.
+                          {t("photoEvidenceSub")}
                         </p>
                       </div>
                     </div>
 
                     <label className="cursor-pointer px-3.5 py-1.5 bg-gov-navy hover:bg-gov-navyLight text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-1.5 active:scale-95">
                       <Upload className="w-3.5 h-3.5" />
-                      <span>Upload Photos</span>
+                      <span>{t("uploadPhotos")}</span>
                       <input
                         type="file"
                         multiple
@@ -910,7 +941,7 @@ export default function NewChallengePage() {
                   {/* 1-Click Sample Photo Presets */}
                   <div className="bg-white p-3 rounded-xl border border-slate-200">
                     <span className="text-[11px] font-bold text-slate-600 block mb-2">
-                      1-Click Sample Disaster Photos (For rapid demonstration):
+                      {language === "hi" ? "1-क्लिक नमूना आपदा फोटो (त्वरित प्रदर्शन हेतु):" : "1-Click Sample Disaster Photos (For rapid demonstration):"}
                     </span>
                     <div className="flex flex-wrap gap-2">
                       {SAMPLE_DISASTER_PHOTOS.map((sample, idx) => (
@@ -971,93 +1002,12 @@ export default function NewChallengePage() {
                   ) : (
                     <div className="text-center py-6 bg-white rounded-xl border border-dashed border-slate-300 text-slate-400 text-xs">
                       <ImageIcon className="w-8 h-8 mx-auto mb-1 text-slate-300" />
-                      <span>No photos attached yet. Click &ldquo;Upload Photos&rdquo; or pick a sample above.</span>
+                      <span>{language === "hi" ? "अभी तक कोई फ़ोटो संलग्न नहीं है। अपलोड करें या ऊपर से एक नमूना चुनें।" : "No photos attached yet. Click \"Upload Photos\" or pick a sample above."}</span>
                     </div>
                   )}
                 </div>
 
-                {/* 2. VIDEO EVIDENCE SECTION */}
-                <div className="p-5 rounded-2xl border border-slate-200 bg-slate-50/60 space-y-4">
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <div className="flex items-center gap-2">
-                      <div className="p-2 rounded-xl bg-blue-100 text-blue-700">
-                        <Video className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-bold text-slate-900">
-                          Video Evidence (Drone / Mobile Sweep)
-                        </h3>
-                        <p className="text-[11px] text-slate-500">
-                          Attach an on-site video capture (.mp4, .webm) or link to aerial survey footage.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          sound.playClick();
-                          setVideoUrl(SAMPLE_DRONE_VIDEO.url);
-                        }}
-                        className="px-3 py-1.5 rounded-xl border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-800 text-xs font-bold transition-all"
-                      >
-                        + 1-Click Drone Video
-                      </button>
-
-                      <label className="cursor-pointer px-3.5 py-1.5 bg-gov-navy hover:bg-gov-navyLight text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-1.5 active:scale-95">
-                        <Upload className="w-3.5 h-3.5" />
-                        <span>Upload Video</span>
-                        <input
-                          type="file"
-                          accept="video/*"
-                          onChange={handleVideoUpload}
-                          className="hidden"
-                        />
-                      </label>
-                    </div>
-                  </div>
-
-                  {/* Video URL Input */}
-                  <div>
-                    <input
-                      type="url"
-                      value={videoUrl}
-                      onChange={(e) => setVideoUrl(e.target.value)}
-                      placeholder="Or paste video link: https://.../incident.mp4"
-                      className="w-full text-xs p-2.5 border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-gov-navy focus:outline-none font-mono"
-                    />
-                  </div>
-
-                  {/* Live HTML5 Video Player Preview */}
-                  {videoUrl ? (
-                    <div className="relative rounded-2xl overflow-hidden border border-slate-300 bg-black shadow-md">
-                      <video
-                        src={videoUrl}
-                        controls
-                        className="w-full max-h-[300px] object-contain bg-black"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          sound.playClick();
-                          setVideoUrl("");
-                        }}
-                        className="absolute top-3 right-3 px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold shadow-md flex items-center gap-1"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>Remove Video</span>
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="text-center py-6 bg-white rounded-xl border border-dashed border-slate-300 text-slate-400 text-xs">
-                      <FileVideo className="w-8 h-8 mx-auto mb-1 text-slate-300" />
-                      <span>No video attached. Upload or click &ldquo;+ 1-Click Drone Video&rdquo; to preview.</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* 3. AUDIO / VOICE MEMO SECTION */}
+                {/* 2. AUDIO / VOICE MEMO SECTION */}
                 <div className="p-5 rounded-2xl border border-slate-200 bg-slate-50/60 space-y-4">
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <div className="flex items-center gap-2">
@@ -1066,10 +1016,10 @@ export default function NewChallengePage() {
                       </div>
                       <div>
                         <h3 className="text-sm font-bold text-slate-900">
-                          Voice Audio Memo & Distress Recording
+                          {t("audioMemoTitle")}
                         </h3>
                         <p className="text-[11px] text-slate-500">
-                          Record live emergency audio from your microphone or upload a voice dispatch.
+                          {t("audioMemoSub")}
                         </p>
                       </div>
                     </div>
@@ -1083,12 +1033,12 @@ export default function NewChallengePage() {
                         }}
                         className="px-3 py-1.5 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold transition-all"
                       >
-                        + 1-Click Voice Memo
+                        {t("addSampleAudio")}
                       </button>
 
                       <label className="cursor-pointer px-3.5 py-1.5 bg-gov-navy hover:bg-gov-navyLight text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-1.5 active:scale-95">
                         <Upload className="w-3.5 h-3.5" />
-                        <span>Upload Audio</span>
+                        <span>{t("uploadAudio")}</span>
                         <input
                           type="file"
                           accept="audio/*"
@@ -1112,12 +1062,14 @@ export default function NewChallengePage() {
                       )}
                       <div>
                         <div className="text-xs font-bold text-slate-800">
-                          {recordingAudio ? "Recording live incident dispatch..." : "Microphone Audio Recorder"}
+                          {recordingAudio
+                            ? t("recordingDispatch")
+                            : (language === "hi" ? "माइक्रोफ़ोन ऑडियो रिकॉर्डर" : "Microphone Audio Recorder")}
                         </div>
                         <div className="text-[11px] font-mono text-slate-500">
                           {recordingAudio
                             ? `00:${recordingTime < 10 ? `0${recordingTime}` : recordingTime} / 01:00`
-                            : "Click record to capture live ground voice testimony"}
+                            : (language === "hi" ? "लाइव आवाज़ रिकॉर्ड करने के लिए रिकॉर्ड पर क्लिक करें" : "Click record to capture live ground voice testimony")}
                         </div>
                       </div>
                     </div>
@@ -1129,7 +1081,7 @@ export default function NewChallengePage() {
                         className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md active:scale-95 transition-all"
                       >
                         <Square className="w-3.5 h-3.5 fill-current" />
-                        <span>Stop Recording</span>
+                        <span>{t("stopRecording")}</span>
                       </button>
                     ) : (
                       <button
@@ -1138,7 +1090,7 @@ export default function NewChallengePage() {
                         className="px-4 py-2 bg-gov-saffron hover:bg-orange-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md active:scale-95 transition-all"
                       >
                         <Radio className="w-3.5 h-3.5" />
-                        <span>Start Recording</span>
+                        <span>{t("startRecording")}</span>
                       </button>
                     )}
                   </div>
@@ -1159,7 +1111,7 @@ export default function NewChallengePage() {
                         className="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
-                        <span>Remove Audio</span>
+                        <span>{t("removeAudio")}</span>
                       </button>
                     </div>
                   ) : null}
@@ -1174,30 +1126,32 @@ export default function NewChallengePage() {
                 <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-900 to-gov-navy text-white shadow-md">
                   <div className="flex items-center justify-between gap-2 mb-3">
                     <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
-                      <Sparkles className="w-4 h-4" /> AI Problem Segregation & Triage Preview
+                      <Sparkles className="w-4 h-4" /> {t("aiSegregationTitle")}
                     </span>
                     <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-white/10 text-slate-200">
-                      NLP Model: Active
+                      {t("nlpModelActive")}
                     </span>
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs mb-3">
                     <div className="p-2.5 bg-white/5 rounded-xl border border-white/10">
-                      <span className="block text-[10px] text-slate-400 uppercase">Severity</span>
+                      <span className="block text-[10px] text-slate-400 uppercase">
+                        {language === "hi" ? "गंभीरता (Severity)" : "Severity"}
+                      </span>
                       <span className="font-bold text-amber-300 text-sm">
                         {liveClassification.severity}
                       </span>
                     </div>
 
                     <div className="p-2.5 bg-white/5 rounded-xl border border-white/10">
-                      <span className="block text-[10px] text-slate-400 uppercase">Urgency Score</span>
+                      <span className="block text-[10px] text-slate-400 uppercase">{t("urgencyMetric")}</span>
                       <span className="font-bold text-white text-sm">
                         {liveClassification.urgencyScore} / 100
                       </span>
                     </div>
 
                     <div className="p-2.5 bg-white/5 rounded-xl border border-white/10 col-span-2">
-                      <span className="block text-[10px] text-slate-400 uppercase">Target Institute</span>
+                      <span className="block text-[10px] text-slate-400 uppercase">{t("targetInstitute")}</span>
                       <span className="font-bold text-blue-200 text-xs line-clamp-1">
                         {liveClassification.recommendedUniversity.name}
                       </span>
@@ -1206,10 +1160,12 @@ export default function NewChallengePage() {
 
                   {liveClassification.tags.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 pt-2 border-t border-white/10 text-[11px]">
-                      <span className="text-slate-400 mr-1">Auto-Detected Tags:</span>
-                      {liveClassification.tags.map((t, i) => (
+                      <span className="text-slate-400 mr-1">
+                        {language === "hi" ? "स्वतः पहचाने गए टैग:" : "Auto-Detected Tags:"}
+                      </span>
+                      {liveClassification.tags.map((tItem, i) => (
                         <span key={i} className="px-2 py-0.5 rounded bg-white/10 text-amber-200 font-medium">
-                          #{t}
+                          #{tItem}
                         </span>
                       ))}
                     </div>
@@ -1219,28 +1175,25 @@ export default function NewChallengePage() {
                 {/* Summary Check */}
                 <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs space-y-2.5">
                   <div className="flex justify-between pb-2 border-b border-slate-200">
-                    <span className="text-slate-500 font-medium">Title:</span>
+                    <span className="text-slate-500 font-medium">{t("problemTitleLabel")}:</span>
                     <span className="font-bold text-slate-900 text-right max-w-xs">{title}</span>
                   </div>
                   <div className="flex justify-between pb-2 border-b border-slate-200">
-                    <span className="text-slate-500 font-medium">Jurisdiction:</span>
+                    <span className="text-slate-500 font-medium">{t("jurisdiction")}:</span>
                     <span className="font-bold text-slate-800">{district}, {state}</span>
                   </div>
                   <div className="flex justify-between pb-2 border-b border-slate-200">
-                    <span className="text-slate-500 font-medium">GPS Coordinates:</span>
+                    <span className="text-slate-500 font-medium">{t("gpsCoords")}:</span>
                     <span className="font-mono text-slate-700">{latitude}, {longitude}</span>
                   </div>
                   <div className="flex justify-between items-center pt-1">
-                    <span className="text-slate-500 font-medium">Media Attached:</span>
+                    <span className="text-slate-500 font-medium">{t("mediaAttached")}:</span>
                     <div className="flex items-center gap-2">
                       <span className="px-2 py-0.5 rounded bg-orange-100 text-orange-800 font-bold">
-                        📷 {photos.length} Photo{photos.length !== 1 ? "s" : ""}
-                      </span>
-                      <span className={`px-2 py-0.5 rounded font-bold ${videoUrl ? "bg-blue-100 text-blue-800" : "bg-slate-200 text-slate-500"}`}>
-                        🎥 {videoUrl ? "Video Attached" : "No Video"}
+                        📷 {photos.length} {language === "hi" ? "फ़ोटो" : (photos.length !== 1 ? "Photos" : "Photo")}
                       </span>
                       <span className={`px-2 py-0.5 rounded font-bold ${audioUrl ? "bg-emerald-100 text-emerald-800" : "bg-slate-200 text-slate-500"}`}>
-                        🎙️ {audioUrl ? "Audio Memo" : "No Audio"}
+                        🎙️ {audioUrl ? (language === "hi" ? "ऑडियो संलग्न" : "Audio Memo") : (language === "hi" ? "कोई ऑडियो नहीं" : "No Audio")}
                       </span>
                     </div>
                   </div>
@@ -1259,7 +1212,7 @@ export default function NewChallengePage() {
                   }}
                   className="py-2.5 px-4 rounded-xl border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50"
                 >
-                  &larr; Previous Step
+                  {t("previousStep")}
                 </button>
               ) : (
                 <div />
@@ -1271,17 +1224,17 @@ export default function NewChallengePage() {
                   onClick={() => {
                     if (step === 1) {
                       if (!title.trim() || !description.trim()) {
-                        setError("Please provide a title and detailed description before proceeding.");
+                        setError(language === "hi" ? "आगे बढ़ने से पहले कृपया शीर्षक और विवरण प्रदान करें।" : "Please provide a title and detailed description before proceeding.");
                         sound.playAlert();
                         return;
                       }
                       if (title.trim().length < 3) {
-                        setError("Title must be at least 3 characters long.");
+                        setError(language === "hi" ? "शीर्षक कम से कम 3 अक्षरों का होना चाहिए।" : "Title must be at least 3 characters long.");
                         sound.playAlert();
                         return;
                       }
                       if (description.trim().length < 10) {
-                        setError("Description must be at least 10 characters long.");
+                        setError(language === "hi" ? "विवरण कम से कम 10 अक्षरों का होना चाहिए।" : "Description must be at least 10 characters long.");
                         sound.playAlert();
                         return;
                       }
@@ -1308,10 +1261,10 @@ export default function NewChallengePage() {
                 >
                   <span>
                     {step === 1
-                      ? "Proceed to GIS Map"
+                      ? t("proceedGisMap")
                       : step === 2
-                      ? "Proceed to Media Evidence"
-                      : "Proceed to AI Triage"}
+                      ? t("proceedMedia")
+                      : t("proceedTriage")}
                   </span>
                   <ArrowRight className="w-4 h-4" />
                 </button>

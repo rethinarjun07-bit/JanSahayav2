@@ -1,3 +1,4 @@
+@import "leaflet/dist/leaflet.css";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -37,15 +38,36 @@
 }
 
 /* Custom Leaflet Map Pin Styles */
-.custom-leaflet-marker {
-  background: transparent;
-  border: none;
+.custom-leaflet-marker,
+.interactive-hazard-marker {
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+.interactive-hazard-marker:focus,
+.interactive-hazard-marker:active {
+  outline: none !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 
 .leaflet-popup-content-wrapper {
   border-radius: 1rem !important;
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
   border: 1px solid #e2e8f0 !important;
+}
+
+.leaflet-container {
+  cursor: grab !important;
+}
+
+.leaflet-container.leaflet-drag-target,
+.leaflet-container:active {
+  cursor: grabbing !important;
 }
 
 .leaflet-popup-tip {

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" width="800" height="450">
+    <rect width="800" height="450" fill="#1e293b"/>
+    <circle cx="400" cy="225" r="140" fill="none" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="6,4"/>
+    <circle cx="400" cy="225" r="80" fill="none" stroke="#0284c7" stroke-width="1.5"/>
+    <circle cx="400" cy="225" r="6" fill="#ef4444"/>
+    <text x="400" y="250" fill="#ffffff" font-family="sans-serif" font-size="14" font-weight="bold" text-anchor="middle">INCIDENT SITE VERIFICATION</text>
+    <text x="400" y="275" fill="#94a3b8" font-family="monospace" font-size="11" text-anchor="middle">GEOTAG ACCREDITED BY CITIZEN COPILOT</text>
+    <rect x="20" y="20" width="280" height="75" rx="10" fill="#0f172a" fill-opacity="0.85" stroke="#10b981" stroke-width="1"/>
+    <text x="36" y="40" fill="#f8fafc" font-family="sans-serif" font-size="12" font-weight="bold">JANSAHAYA AI VERIFIED DATA</text>
+    <text x="36" y="60" fill="#94a3b8" font-family="monospace" font-size="10">CONFIDENCE: 94% Verified</text>
+    <text x="36" y="76" fill="#10b981" font-family="monospace" font-size="10">TAMPER-PROOF AUDIT HASH MATCHED</text>
+  </svg>

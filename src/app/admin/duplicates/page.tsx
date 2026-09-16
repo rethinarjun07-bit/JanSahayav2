@@ -6,35 +6,42 @@ import { getCurrentUser } from "@/lib/auth";
 import { AuthorizedAuthorityGuard } from "@/components/authorized-authority-guard";
 import { DuplicateMergeClient } from "./duplicate-merge-client";
 import { PagePop, PopItem } from "@/components/page-pop-transition";
+import { DEMO_CHALLENGES, DEMO_DUPLICATE_MERGES } from "@/lib/demo-data";
 
 export const dynamic = "force-dynamic";
 
 export default async function DuplicateConsolePage() {
   const currentUser = await getCurrentUser();
 
-  // Fetch active challenges
-  const challenges = await db.challenge.findMany({
-    where: { status: { not: "MERGED" } },
-    orderBy: { createdAt: "desc" },
-    select: {
-      id: true,
-      title: true,
-      description: true,
-      category: true,
-      severity: true,
-      district: true,
-      state: true,
-      status: true,
-      urgencyScore: true,
-      createdAt: true,
-    },
-  });
+  let challenges: any[] = [];
+  let mergeHistory: any[] = [];
 
-  // Fetch already merged records for history
-  const mergeHistory = await db.duplicateMerge.findMany({
-    orderBy: { mergedAt: "desc" },
-    take: 5,
-  });
+  try {
+    challenges = await db.challenge.findMany({
+      where: { status: { not: "MERGED" } },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        category: true,
+        severity: true,
+        district: true,
+        state: true,
+        status: true,
+        urgencyScore: true,
+        createdAt: true,
+      },
+    });
+
+    mergeHistory = await db.duplicateMerge.findMany({
+      orderBy: { mergedAt: "desc" },
+      take: 5,
+    });
+  } catch (err) {
+    challenges = DEMO_CHALLENGES.filter((c) => c.status !== "MERGED");
+    mergeHistory = DEMO_DUPLICATE_MERGES;
+  }
 
   return (
     <AuthorizedAuthorityGuard

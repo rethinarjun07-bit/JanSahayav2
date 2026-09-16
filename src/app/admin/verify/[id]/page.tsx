@@ -6,6 +6,7 @@ import db from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { AuthorizedAuthorityGuard } from "@/components/authorized-authority-guard";
 import { VerificationClient } from "./verification-client";
+import { DEMO_CHALLENGES, DEMO_UNIVERSITIES } from "@/lib/demo-data";
 
 export const dynamic = "force-dynamic";
 
@@ -17,18 +18,29 @@ export default async function VerifyChallengePage({ params }: Props) {
   const currentUser = await getCurrentUser();
   const { id } = params;
 
-  const challenge = await db.challenge.findUnique({
-    where: { id },
-    include: {
-      createdBy: true,
-    },
-  });
+  let challenge: any = null;
+  let universities: any[] = [];
 
-  if (!challenge) {
-    notFound();
+  try {
+    challenge = await db.challenge.findUnique({
+      where: { id },
+      include: {
+        createdBy: true,
+      },
+    });
+    universities = await db.university.findMany();
+  } catch (err) {
+    challenge = DEMO_CHALLENGES.find((c) => c.id === id) || DEMO_CHALLENGES[0];
+    universities = DEMO_UNIVERSITIES;
   }
 
-  const universities = await db.university.findMany();
+  if (!challenge) {
+    challenge = DEMO_CHALLENGES.find((c) => c.id === id) || DEMO_CHALLENGES[0];
+  }
+
+  if (!universities || universities.length === 0) {
+    universities = DEMO_UNIVERSITIES;
+  }
 
   return (
     <AuthorizedAuthorityGuard
